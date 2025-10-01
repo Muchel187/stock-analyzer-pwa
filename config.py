@@ -10,8 +10,15 @@ class Config:
 
     # Database
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///stockanalyzer.db'
+    
+    # Fix for Render.com DATABASE_URL format issues
+    if SQLALCHEMY_DATABASE_URI.startswith('DATABASE_URL='):
+        SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI.replace('DATABASE_URL=', '', 1)
+    
+    # Fix for Heroku postgres:// vs postgresql://
     if SQLALCHEMY_DATABASE_URI.startswith('postgres://'):
         SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI.replace('postgres://', 'postgresql://', 1)
+    
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # JWT
