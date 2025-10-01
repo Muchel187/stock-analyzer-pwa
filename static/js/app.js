@@ -1226,6 +1226,11 @@ class StockAnalyzerApp {
                     </div>
                 </div>
             </div>
+            <div class="export-actions">
+                <button class="export-btn" onclick="app.exportPortfolio()">
+                    📥 Export as CSV
+                </button>
+            </div>
         `;
 
         // Display holdings
@@ -1311,6 +1316,27 @@ class StockAnalyzerApp {
                 </div>
             </div>
         `).join('');
+    }
+
+    // Export functions
+    async exportPortfolio() {
+        try {
+            const portfolio = await api.getPortfolio();
+            window.exportManager.exportPortfolioCSV(portfolio);
+            this.showNotification('Portfolio erfolgreich exportiert', 'success');
+        } catch (error) {
+            this.showNotification('Export fehlgeschlagen', 'error');
+        }
+    }
+
+    async exportWatchlist() {
+        try {
+            const response = await api.getWatchlist();
+            window.exportManager.exportWatchlistCSV(response.items);
+            this.showNotification('Watchlist erfolgreich exportiert', 'success');
+        } catch (error) {
+            this.showNotification('Export fehlgeschlagen', 'error');
+        }
     }
 
     // Alerts functionality
