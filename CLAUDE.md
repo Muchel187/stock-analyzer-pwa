@@ -1071,3 +1071,64 @@ curl -X POST http://localhost:5000/api/stock/ai-recommendations \
 
 **Important:** This optimization removed AI calls from the recommendations widget. The individual stock AI analysis (on the analysis page) still uses full AI analysis and works as expected.
 
+
+### Volume Chart Height Fix (October 2025)
+
+**Problem:** Volume chart extended infinitely downward on the analysis page, causing poor UX and excessive scrolling.
+
+**Root Cause:**
+- No height constraints on `.volume-chart-container`
+- No max-height on `#volumeChart` canvas
+- Chart.js Y-axis not configured with `beginAtZero`
+- Too many Y-axis ticks causing vertical expansion
+
+**Solution Implemented:**
+
+**CSS Changes** (`static/css/components.css`):
+```css
+.volume-chart-container {
+    height: 200px;              /* Fixed container height */
+    position: relative;         /* Proper positioning */
+}
+
+#volumeChart {
+    max-height: 150px !important;  /* Strict canvas limit */
+    height: 150px !important;      /* Fixed canvas height */
+}
+```
+
+**Chart.js Changes** (`static/js/app.js`):
+```javascript
+scales: {
+    y: {
+        beginAtZero: true,      // Force Y-axis to start at 0
+        maxTicksLimit: 5,       // Limit to 5 Y-axis labels
+        ...
+    }
+}
+```
+
+**Results:**
+- Volume chart now displays at compact 150px height
+- Y-axis starts at 0 for proper proportions
+- Only 5 Y-axis labels reduce visual noise
+- No more infinite scrolling issue
+- Professional, clean appearance
+- Better use of screen space
+
+**Files Modified:**
+- `static/css/components.css` - Height constraints (+7 lines)
+- `static/js/app.js` - Y-axis configuration (+2 lines)
+
+**Testing:**
+- ✅ Chart renders at correct height (150px)
+- ✅ No overflow issues
+- ✅ Responsive within constraints
+- ✅ Data clearly visible and proportional
+- ✅ Professional appearance maintained
+
+**Visual Improvement:**
+- Before: Chart extended 1000+ pixels downward
+- After: Compact 150px height with all data visible
+- User can now see price + volume charts without excessive scrolling
+
