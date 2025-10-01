@@ -1,0 +1,21 @@
+{
+  "name": "Stock Analyzer - Portfolio & Aktienanalyse",
+  "short_name": "StockAnalyzer",
+  "description": "Persönliches Aktienanalyse- und Portfolio-Management-Tool",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7fafc",
+  "theme_color": "#667eea",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/static/images/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["finance", "productivity"],
+  "lang": "de-DE",
+  "dir": "ltr"
+}

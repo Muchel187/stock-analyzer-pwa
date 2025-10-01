@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Persönliches Aktienanalyse- und Portfolio-Management-Tool">
+    <meta name="theme-color" content="#2c3e50">
+
+    <title>Stock Analyzer - Portfolio & Aktienanalyse</title>
+
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Stock Analyzer">
+
+    <!-- Icons -->
+    <link rel="icon" type="image/png" href="/static/images/icon-192.png">
+    <link rel="apple-touch-icon" href="/static/images/icon-192.png">
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+
+    <!-- Chart.js für Diagramme -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <span class="nav-logo">📈</span>
+                <span class="nav-title">Stock Analyzer</span>
+            </div>
+
+            <div class="nav-menu" id="navMenu">
+                <a href="#dashboard" class="nav-link active" data-page="dashboard">Dashboard</a>
+                <a href="#portfolio" class="nav-link" data-page="portfolio">Portfolio</a>
+                <a href="#watchlist" class="nav-link" data-page="watchlist">Watchlist</a>
+                <a href="#screener" class="nav-link" data-page="screener">Screener</a>
+                <a href="#alerts" class="nav-link" data-page="alerts">Alerts</a>
+                <a href="#analysis" class="nav-link" data-page="analysis">Analyse</a>
+            </div>
+
+            <div class="nav-user">
+                <span id="userDisplay" class="user-display" style="display:none;">
+                    <span id="username"></span>
+                    <button class="btn btn-sm btn-outline" onclick="app.logout()">Logout</button>
+                </span>
+                <button id="loginBtn" class="btn btn-primary btn-sm" onclick="app.showLogin()">Login</button>
+            </div>
+
+            <button class="nav-toggle" id="navToggle">☰</button>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="app-container">
+        <!-- Dashboard Page -->
+        <div id="dashboard-page" class="page active">
+            <div class="page-header">
+                <h1>Dashboard</h1>
+                <button class="btn btn-icon" onclick="app.customizeDashboard()" title="Dashboard anpassen">⚙️</button>
+            </div>
+
+            <div class="dashboard-grid" id="dashboardGrid">
+                <!-- Portfolio Widget -->
+                <div class="widget" id="portfolioWidget">
+                    <div class="widget-header">
+                        <h3>Portfolio Performance</h3>
+                        <span class="widget-actions">
+                            <button class="btn-icon" onclick="app.refreshPortfolio()">🔄</button>
+                        </span>
+                    </div>
+                    <div class="widget-body">
+                        <div id="portfolioSummary" class="loading">
+                            <div class="metric-group">
+                                <div class="metric">
+                                    <span class="metric-label">Gesamtwert</span>
+                                    <span class="metric-value" id="totalValue">-</span>
+                                </div>
+                                <div class="metric">
+                                    <span class="metric-label">Tagesperformance</span>
+                                    <span class="metric-value" id="dayPerformance">-</span>
+                                </div>
+                                <div class="metric">
+                                    <span class="metric-label">Gesamtrendite</span>
+                                    <span class="metric-value" id="totalReturn">-</span>
+                                </div>
+                            </div>
+                            <canvas id="portfolioChart" style="display:none;"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Watchlist Widget -->
+                <div class="widget" id="watchlistWidget">
+                    <div class="widget-header">
+                        <h3>Watchlist</h3>
+                        <span class="widget-actions">
+                            <button class="btn-icon" onclick="app.addToWatchlist()">➕</button>
+                        </span>
+                    </div>
+                    <div class="widget-body">
+                        <div id="watchlistItems" class="watchlist-items loading">
+                            <!-- Watchlist items werden hier eingefügt -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recommendations Widget -->
+                <div class="widget" id="recommendationsWidget">
+                    <div class="widget-header">
+                        <h3>Top Empfehlungen</h3>
+                        <span class="widget-actions">
+                            <button class="btn-icon" onclick="app.refreshRecommendations()">🔄</button>
+                        </span>
+                    </div>
+                    <div class="widget-body">
+                        <div id="recommendationsList" class="recommendations loading">
+                            <!-- Empfehlungen werden hier eingefügt -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Alerts Widget -->
+                <div class="widget" id="alertsWidget">
+                    <div class="widget-header">
+                        <h3>Aktive Alerts</h3>
+                        <span class="widget-actions">
+                            <span class="badge" id="alertCount">0</span>
+                        </span>
+                    </div>
+                    <div class="widget-body">
+                        <div id="activeAlerts" class="alerts-list loading">
+                            <!-- Alerts werden hier eingefügt -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Portfolio Page -->
+        <div id="portfolio-page" class="page">
+            <div class="page-header">
+                <h1>Portfolio</h1>
+                <button class="btn btn-primary" onclick="app.showAddTransaction()">+ Transaktion</button>
+            </div>
+
+            <div class="portfolio-container">
+                <div class="portfolio-summary card">
+                    <h3>Portfolio Übersicht</h3>
+                    <div id="portfolioDetailSummary">
+                        <!-- Portfolio Details -->
+                    </div>
+                </div>
+
+                <div class="portfolio-holdings card">
+                    <h3>Positionen</h3>
+                    <div id="portfolioHoldings">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>Name</th>
+                                    <th>Anteile</th>
+                                    <th>Kurs</th>
+                                    <th>Wert</th>
+                                    <th>Performance</th>
+                                    <th>Aktionen</th>
+                                </tr>
+                            </thead>
+                            <tbody id="portfolioTableBody">
+                                <!-- Portfolio Positionen -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="portfolio-chart card">
+                    <h3>Diversifikation</h3>
+                    <canvas id="diversificationChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Watchlist Page -->
+        <div id="watchlist-page" class="page">
+            <div class="page-header">
+                <h1>Watchlist</h1>
+                <button class="btn btn-primary" onclick="app.showAddToWatchlist()">+ Aktie hinzufügen</button>
+            </div>
+
+            <div class="watchlist-container">
+                <div class="watchlist-grid" id="watchlistGrid">
+                    <!-- Watchlist Cards -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Screener Page -->
+        <div id="screener-page" class="page">
+            <div class="page-header">
+                <h1>Stock Screener</h1>
+                <button class="btn btn-outline" onclick="app.resetScreener()">Filter zurücksetzen</button>
+            </div>
+
+            <div class="screener-container">
+                <div class="screener-filters card">
+                    <h3>Filter</h3>
+                    <form id="screenerForm" class="filter-form">
+                        <div class="filter-group">
+                            <label>Markt</label>
+                            <select id="marketFilter">
+                                <option value="USA">USA</option>
+                                <option value="DAX">DAX</option>
+                                <option value="ALL">Alle</option>
+                            </select>
+                        </div>
+
+                        <div class="filter-group">
+                            <label>Market Cap (Min)</label>
+                            <input type="number" id="minMarketCap" placeholder="z.B. 1000000000">
+                        </div>
+
+                        <div class="filter-group">
+                            <label>P/E Ratio</label>
+                            <div class="range-inputs">
+                                <input type="number" id="minPE" placeholder="Min" step="0.1">
+                                <input type="number" id="maxPE" placeholder="Max" step="0.1">
+                            </div>
+                        </div>
+
+                        <div class="filter-group">
+                            <label>Dividendenrendite (Min %)</label>
+                            <input type="number" id="minDividend" placeholder="z.B. 2" step="0.1">
+                        </div>
+
+                        <div class="filter-group">
+                            <label>Strategien</label>
+                            <div class="checkbox-group">
+                                <label><input type="checkbox" id="preferValue"> Value</label>
+                                <label><input type="checkbox" id="preferGrowth"> Growth</label>
+                                <label><input type="checkbox" id="preferDividends"> Dividenden</label>
+                                <label><input type="checkbox" id="preferMomentum"> Momentum</label>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-block">Suchen</button>
+                    </form>
+
+                    <div class="preset-strategies">
+                        <h4>Vorgefertigte Strategien</h4>
+                        <div id="presetStrategies" class="preset-buttons">
+                            <!-- Preset Buttons -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="screener-results card">
+                    <h3>Ergebnisse <span id="resultCount"></span></h3>
+                    <div id="screenerResults">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>Name</th>
+                                    <th>Kurs</th>
+                                    <th>Market Cap</th>
+                                    <th>P/E</th>
+                                    <th>Dividende</th>
+                                    <th>Score</th>
+                                    <th>Aktion</th>
+                                </tr>
+                            </thead>
+                            <tbody id="screenerTableBody">
+                                <!-- Ergebnisse -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alerts Page -->
+        <div id="alerts-page" class="page">
+            <div class="page-header">
+                <h1>Preis-Alerts</h1>
+                <button class="btn btn-primary" onclick="app.showCreateAlert()">+ Alert erstellen</button>
+            </div>
+
+            <div class="alerts-container">
+                <div class="alerts-stats card">
+                    <h3>Alert Statistiken</h3>
+                    <div id="alertStats" class="stats-grid">
+                        <!-- Statistiken -->
+                    </div>
+                </div>
+
+                <div class="alerts-list-container card">
+                    <h3>Meine Alerts</h3>
+                    <div class="alert-tabs">
+                        <button class="tab-btn active" data-tab="active">Aktiv</button>
+                        <button class="tab-btn" data-tab="triggered">Ausgelöst</button>
+                        <button class="tab-btn" data-tab="all">Alle</button>
+                    </div>
+                    <div id="alertsList" class="alerts-grid">
+                        <!-- Alerts -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analysis Page -->
+        <div id="analysis-page" class="page">
+            <div class="page-header">
+                <h1>Aktienanalyse</h1>
+            </div>
+
+            <div class="analysis-container">
+                <div class="search-box card">
+                    <input type="text" id="stockSearch" class="search-input" placeholder="Symbol eingeben (z.B. AAPL, MSFT)...">
+                    <button class="btn btn-primary" onclick="app.analyzeStock()">Analysieren</button>
+                </div>
+
+                <div id="analysisResult" style="display:none;">
+                    <div class="stock-header card">
+                        <h2 id="stockName"></h2>
+                        <div id="stockPrice" class="price-display"></div>
+                    </div>
+
+                    <div class="analysis-tabs card">
+                        <div class="tab-buttons">
+                            <button class="tab-btn active" data-analysis-tab="overview">Übersicht</button>
+                            <button class="tab-btn" data-analysis-tab="technical">Technisch</button>
+                            <button class="tab-btn" data-analysis-tab="fundamental">Fundamental</button>
+                            <button class="tab-btn" data-analysis-tab="ai">KI-Analyse</button>
+                        </div>
+
+                        <div class="tab-content">
+                            <div id="overview-tab" class="tab-pane active">
+                                <!-- Übersicht -->
+                            </div>
+                            <div id="technical-tab" class="tab-pane">
+                                <!-- Technische Analyse -->
+                            </div>
+                            <div id="fundamental-tab" class="tab-pane">
+                                <!-- Fundamentalanalyse -->
+                            </div>
+                            <div id="ai-tab" class="tab-pane">
+                                <!-- KI-Analyse -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="chart-container card">
+                        <canvas id="priceChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="modalOverlay" class="modal-overlay" style="display:none;"></div>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Anmelden</h2>
+                <button class="close-btn" onclick="app.closeModal('loginModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label>E-Mail oder Benutzername</label>
+                        <input type="text" id="loginEmail" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Passwort</label>
+                        <input type="password" id="loginPassword" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">Anmelden</button>
+                </form>
+                <div class="modal-footer">
+                    <p>Noch kein Konto? <a href="#" onclick="app.showRegister()">Registrieren</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Register Modal -->
+    <div id="registerModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Registrieren</h2>
+                <button class="close-btn" onclick="app.closeModal('registerModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="registerForm">
+                    <div class="form-group">
+                        <label>E-Mail</label>
+                        <input type="email" id="registerEmail" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Benutzername</label>
+                        <input type="text" id="registerUsername" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Passwort</label>
+                        <input type="password" id="registerPassword" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">Registrieren</button>
+                </form>
+                <div class="modal-footer">
+                    <p>Bereits registriert? <a href="#" onclick="app.showLogin()">Anmelden</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Container -->
+    <div id="notificationContainer" class="notification-container"></div>
+
+    <!-- Scripts -->
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/components.js"></script>
+    <script src="/static/js/charts.js"></script>
+    <script src="/static/js/app.js"></script>
+
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => console.log('Service Worker registered'))
+                    .catch(error => console.error('Service Worker registration failed:', error));
+            });
+        }
+    </script>
+</body>
+</html>

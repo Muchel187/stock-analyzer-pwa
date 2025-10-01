@@ -1,0 +1,298 @@
+"""
+Alternative data sources for stock information when Yahoo Finance is unavailable
+"""
+import requests
+import os
+import logging
+from typing import Dict, Optional, Any
+from datetime import datetime
+
+logger = logging.getLogger(__name__)
+
+
+class AlphaVantageService:
+    """Alpha Vantage API service (free tier: 25 requests/day)"""
+
+    BASE_URL = "https://www.alphavantage.co/query"
+
+    @staticmethod
+    def get_stock_quote(ticker: str) -> Optional[Dict[str, Any]]:
+        """Get real-time stock quote from Alpha Vantage"""
+        api_key = os.getenv('ALPHA_VANTAGE_API_KEY')
+        if not api_key:
+            logger.warning("Alpha Vantage API key not configured")
+            return None
+
+        try:
+            params = {
+                'function': 'GLOBAL_QUOTE',
+                'symbol': ticker,
+                'apikey': api_key
+            }
+
+            response = requests.get(AlphaVantageService.BASE_URL, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+
+            if 'Global Quote' not in data or not data['Global Quote']:
+                logger.warning(f"No data returned from Alpha Vantage for {ticker}")
+                return None
+
+            quote = data['Global Quote']
+
+            # Transform to our standard format
+            return {
+                'ticker': ticker.upper(),
+                'current_price': float(quote.get('05. price', 0)),
+                'previous_close': float(quote.get('08. previous close', 0)),
+                'open': float(quote.get('02. open', 0)),
+                'day_high': float(quote.get('03. high', 0)),
+                'day_low': float(quote.get('04. low', 0)),
+                'volume': int(quote.get('06. volume', 0)),
+                'change': float(quote.get('09. change', 0)),
+                'change_percent': quote.get('10. change percent', '0%').replace('%', ''),
+                'source': 'alpha_vantage'
+            }
+
+        except Exception as e:
+            logger.error(f"Alpha Vantage error for {ticker}: {str(e)}")
+            return None
+
+    @staticmethod
+    def get_company_overview(ticker: str) -> Optional[Dict[str, Any]]:
+        """Get company overview/fundamental data"""
+        api_key = os.getenv('ALPHA_VANTAGE_API_KEY')
+        if not api_key:
+            return None
+
+        try:
+            params = {
+                'function': 'OVERVIEW',
+                'symbol': ticker,
+                'apikey': api_key
+            }
+
+            response = requests.get(AlphaVantageService.BASE_URL, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+
+            if not data or 'Symbol' not in data:
+                return None
+
+            # Transform to our standard format
+            return {
+                'ticker': ticker.upper(),
+                'company_name': data.get('Name'),
+                'sector': data.get('Sector'),
+                'industry': data.get('Industry'),
+                'description': data.get('Description'),
+                'market_cap': float(data.get('MarketCapitalization', 0)) if data.get('MarketCapitalization') else None,
+                'pe_ratio': float(data.get('PERatio', 0)) if data.get('PERatio') else None,
+                'peg_ratio': float(data.get('PEGRatio', 0)) if data.get('PEGRatio') else None,
+                'book_value': float(data.get('BookValue', 0)) if data.get('BookValue') else None,
+                'dividend_yield': float(data.get('DividendYield', 0)) if data.get('DividendYield') else None,
+                'eps': float(data.get('EPS', 0)) if data.get('EPS') else None,
+                'beta': float(data.get('Beta', 0)) if data.get('Beta') else None,
+                '52_week_high': float(data.get('52WeekHigh', 0)) if data.get('52WeekHigh') else None,
+                '52_week_low': float(data.get('52WeekLow', 0)) if data.get('52WeekLow') else None,
+                'moving_avg_50': float(data.get('50DayMovingAverage', 0)) if data.get('50DayMovingAverage') else None,
+                'moving_avg_200': float(data.get('200DayMovingAverage', 0)) if data.get('200DayMovingAverage') else None,
+                'source': 'alpha_vantage'
+            }
+
+        except Exception as e:
+            logger.error(f"Alpha Vantage overview error for {ticker}: {str(e)}")
+            return None
+
+
+class FinnhubService:
+    """Finnhub API service (free tier: 60 requests/minute)"""
+
+    BASE_URL = "https://finnhub.io/api/v1"
+
+    @staticmethod
+    def get_stock_quote(ticker: str) -> Optional[Dict[str, Any]]:
+        """Get real-time stock quote from Finnhub"""
+        api_key = os.getenv('FINNHUB_API_KEY')
+        if not api_key:
+            logger.warning("Finnhub API key not configured")
+            return None
+
+        try:
+            params = {
+                'symbol': ticker.upper(),
+                'token': api_key
+            }
+
+            response = requests.get(f"{FinnhubService.BASE_URL}/quote", params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+
+            if not data or data.get('c') == 0:
+                logger.warning(f"No data returned from Finnhub for {ticker}")
+                return None
+
+            return {
+                'ticker': ticker.upper(),
+                'current_price': float(data.get('c', 0)),  # Current price
+                'previous_close': float(data.get('pc', 0)),  # Previous close
+                'open': float(data.get('o', 0)),  # Open price
+                'day_high': float(data.get('h', 0)),  # High price
+                'day_low': float(data.get('l', 0)),  # Low price
+                'change': float(data.get('d', 0)),  # Change
+                'change_percent': float(data.get('dp', 0)),  # Change percent
+                'timestamp': datetime.fromtimestamp(data.get('t', 0)).isoformat() if data.get('t') else None,
+                'source': 'finnhub'
+            }
+
+        except Exception as e:
+            logger.error(f"Finnhub error for {ticker}: {str(e)}")
+            return None
+
+    @staticmethod
+    def get_company_profile(ticker: str) -> Optional[Dict[str, Any]]:
+        """Get company profile from Finnhub"""
+        api_key = os.getenv('FINNHUB_API_KEY')
+        if not api_key:
+            return None
+
+        try:
+            params = {
+                'symbol': ticker.upper(),
+                'token': api_key
+            }
+
+            response = requests.get(f"{FinnhubService.BASE_URL}/stock/profile2", params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+
+            if not data or not data.get('name'):
+                return None
+
+            return {
+                'ticker': ticker.upper(),
+                'company_name': data.get('name'),
+                'sector': data.get('finnhubIndustry'),
+                'website': data.get('weburl'),
+                'exchange': data.get('exchange'),
+                'currency': data.get('currency'),
+                'market_cap': data.get('marketCapitalization'),
+                'shares_outstanding': data.get('shareOutstanding'),
+                'logo': data.get('logo'),
+                'country': data.get('country'),
+                'source': 'finnhub'
+            }
+
+        except Exception as e:
+            logger.error(f"Finnhub profile error for {ticker}: {str(e)}")
+            return None
+
+
+class TwelveDataService:
+    """Twelve Data API service (free tier: 800 requests/day, 8 requests/minute)"""
+
+    BASE_URL = "https://api.twelvedata.com"
+
+    @staticmethod
+    def get_stock_quote(ticker: str) -> Optional[Dict[str, Any]]:
+        """Get real-time stock quote from Twelve Data"""
+        api_key = os.getenv('TWELVE_DATA_API_KEY')
+        if not api_key:
+            logger.warning("Twelve Data API key not configured")
+            return None
+
+        try:
+            params = {
+                'symbol': ticker.upper(),
+                'apikey': api_key
+            }
+
+            response = requests.get(f"{TwelveDataService.BASE_URL}/quote", params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+
+            if 'price' not in data or data.get('code') == 400:
+                logger.warning(f"No data returned from Twelve Data for {ticker}")
+                return None
+
+            return {
+                'ticker': ticker.upper(),
+                'company_name': data.get('name'),
+                'current_price': float(data.get('close', 0)),
+                'previous_close': float(data.get('previous_close', 0)),
+                'open': float(data.get('open', 0)),
+                'day_high': float(data.get('high', 0)),
+                'day_low': float(data.get('low', 0)),
+                'volume': int(data.get('volume', 0)),
+                'change': float(data.get('change', 0)),
+                'change_percent': float(data.get('percent_change', 0)),
+                '52_week_high': float(data.get('fifty_two_week', {}).get('high', 0)) if data.get('fifty_two_week') else None,
+                '52_week_low': float(data.get('fifty_two_week', {}).get('low', 0)) if data.get('fifty_two_week') else None,
+                'exchange': data.get('exchange'),
+                'currency': data.get('currency'),
+                'source': 'twelve_data'
+            }
+
+        except Exception as e:
+            logger.error(f"Twelve Data error for {ticker}: {str(e)}")
+            return None
+
+
+class FallbackDataService:
+    """
+    Coordinated fallback service that tries multiple data sources in order
+    """
+
+    # Order of preference for data sources
+    SOURCES = [
+        ('finnhub', FinnhubService),
+        ('twelve_data', TwelveDataService),
+        ('alpha_vantage', AlphaVantageService),
+    ]
+
+    @staticmethod
+    def get_stock_quote(ticker: str) -> Optional[Dict[str, Any]]:
+        """Try to get stock quote from available fallback sources"""
+        for source_name, service_class in FallbackDataService.SOURCES:
+            logger.info(f"Trying {source_name} for {ticker}...")
+            try:
+                data = service_class.get_stock_quote(ticker)
+                if data:
+                    logger.info(f"Successfully fetched {ticker} from {source_name}")
+                    return data
+            except Exception as e:
+                logger.warning(f"{source_name} failed for {ticker}: {str(e)}")
+                continue
+
+        logger.error(f"All fallback sources failed for {ticker}")
+        return None
+
+    @staticmethod
+    def get_company_info(ticker: str) -> Optional[Dict[str, Any]]:
+        """Try to get company information from available sources"""
+        # Try Alpha Vantage (has best company overview)
+        if os.getenv('ALPHA_VANTAGE_API_KEY'):
+            data = AlphaVantageService.get_company_overview(ticker)
+            if data:
+                return data
+
+        # Try Finnhub profile
+        if os.getenv('FINNHUB_API_KEY'):
+            data = FinnhubService.get_company_profile(ticker)
+            if data:
+                return data
+
+        return None
+
+    @staticmethod
+    def merge_data(quote_data: Dict, company_data: Optional[Dict] = None) -> Dict[str, Any]:
+        """Merge quote and company data into comprehensive stock info"""
+        result = quote_data.copy()
+
+        if company_data:
+            # Merge company data, preferring existing values
+            for key, value in company_data.items():
+                if key not in result or result[key] is None:
+                    result[key] = value
+
+        return result
