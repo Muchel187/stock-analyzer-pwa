@@ -266,6 +266,15 @@ class APIService {
             body: JSON.stringify({ tickers, period })
         });
     }
+
+    // News endpoints
+    async getStockNews(ticker, limit = 10, days = 7) {
+        return await this.request(`/stock/${ticker}/news?limit=${limit}&days=${days}`);
+    }
+
+    async getMarketNews(limit = 20) {
+        return await this.request(`/stock/news/market?limit=${limit}`);
+    }
 }
 
 // Create global API instance

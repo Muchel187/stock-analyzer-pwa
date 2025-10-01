@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.services import StockService, AIService
+from app.services.news_service import NewsService
 from datetime import datetime
 
 bp = Blueprint('stock', __name__, url_prefix='/api/stock')
@@ -428,3 +429,56 @@ def compare_stocks():
 
     except Exception as e:
         return jsonify({'error': f'Failed to compare stocks: {str(e)}'}), 500
+
+@bp.route('/<ticker>/news', methods=['GET'])
+def get_stock_news(ticker):
+    """
+    Get latest news for a stock with sentiment analysis
+    
+    Query Parameters:
+    - limit: Number of articles (default: 10, max: 50)
+    - days: Days to look back (default: 7, max: 30)
+    
+    Returns:
+    - news: List of articles with headline, summary, source, url, sentiment
+    - sentiment_score: Overall sentiment (-1 to 1)
+    - news_count: Total articles found
+    - categories: News categories breakdown
+    """
+    try:
+        limit = min(int(request.args.get('limit', 10)), 50)
+        days = min(int(request.args.get('days', 7)), 30)
+        
+        news_data = NewsService.get_company_news(ticker, days=days, limit=limit)
+        
+        if not news_data:
+            return jsonify({'error': f'No news found for {ticker}'}), 404
+        
+        return jsonify(news_data), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to get news: {str(e)}'}), 500
+
+@bp.route('/news/market', methods=['GET'])
+def get_market_news():
+    """
+    Get general market news
+    
+    Query Parameters:
+    - limit: Number of articles (default: 20, max: 50)
+    
+    Returns:
+    - news: List of general market news articles
+    """
+    try:
+        limit = min(int(request.args.get('limit', 20)), 50)
+        
+        news_data = NewsService.get_market_news(limit=limit)
+        
+        if not news_data:
+            return jsonify({'error': 'No market news available'}), 404
+        
+        return jsonify(news_data), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to get market news: {str(e)}'}), 500
