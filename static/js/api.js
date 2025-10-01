@@ -275,6 +275,22 @@ class APIService {
     async getMarketNews(limit = 20) {
         return await this.request(`/stock/news/market?limit=${limit}`);
     }
+
+    // Notification Center endpoints
+    async getTriggeredAlerts() {
+        return await this.request('/alerts/triggered');
+    }
+
+    async acknowledgeAlert(alertId) {
+        return await this.request(`/alerts/${alertId}/acknowledge`, {
+            method: 'POST'
+        });
+    }
+
+    // Search endpoint (already exists, but adding for completeness)
+    async searchStocks(query) {
+        return await this.request(`/stock/search?q=${encodeURIComponent(query)}`);
+    }
 }
 
 // Create global API instance

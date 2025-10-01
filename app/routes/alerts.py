@@ -122,3 +122,47 @@ def check_alerts_manually():
 
     except Exception as e:
         return jsonify({'error': f'Failed to check alerts: {str(e)}'}), 500
+
+@bp.route('/triggered', methods=['GET'])
+@jwt_required()
+def get_triggered_alerts():
+    """Get all triggered but unacknowledged alerts"""
+    try:
+        from app.models.alert import Alert
+        user_id = int(get_jwt_identity())
+        
+        alerts = Alert.query.filter_by(
+            user_id=user_id,
+            is_triggered=True,
+            acknowledged=False
+        ).order_by(Alert.triggered_at.desc()).all()
+        
+        return jsonify([alert.to_dict() for alert in alerts]), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to get triggered alerts: {str(e)}'}), 500
+
+@bp.route('/<int:alert_id>/acknowledge', methods=['POST'])
+@jwt_required()
+def acknowledge_alert(alert_id):
+    """Mark alert as acknowledged"""
+    try:
+        from app.models.alert import Alert
+        from app import db
+        
+        user_id = int(get_jwt_identity())
+        alert = Alert.query.filter_by(id=alert_id, user_id=user_id).first()
+        
+        if not alert:
+            return jsonify({'error': 'Alert not found'}), 404
+        
+        alert.acknowledged = True
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Alert acknowledged'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to acknowledge alert: {str(e)}'}), 500

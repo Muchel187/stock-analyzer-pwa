@@ -115,14 +115,30 @@ class StockAnalyzerApp {
         const userDisplay = document.getElementById('userDisplay');
         const loginBtn = document.getElementById('loginBtn');
         const username = document.getElementById('username');
+        const navNotifications = document.getElementById('navNotifications');
 
         if (this.currentUser) {
             userDisplay.style.display = 'flex';
             loginBtn.style.display = 'none';
             username.textContent = this.currentUser.username;
+            
+            // Show notification bell when logged in
+            if (navNotifications) {
+                navNotifications.style.display = 'block';
+            }
+            
+            // Initialize notification center
+            if (typeof NotificationCenter !== 'undefined' && !window.notificationCenter) {
+                window.notificationCenter = new NotificationCenter(this);
+            }
         } else {
             userDisplay.style.display = 'none';
             loginBtn.style.display = 'block';
+            
+            // Hide notification bell when logged out
+            if (navNotifications) {
+                navNotifications.style.display = 'none';
+            }
         }
     }
 
@@ -1094,10 +1110,124 @@ class StockAnalyzerApp {
             }, 100);
         }
 
+        // Load news when news tab is selected
+        if (tab === 'news' && this.currentAnalysisTicker) {
+            if (!this.newsLoaded) {
+                this.loadNewsTab(this.currentAnalysisTicker);
+                this.newsLoaded = true;
+            }
+        }
+
         // Pre-fill first ticker when compare tab is selected
         if (tab === 'compare' && this.currentAnalysisTicker) {
             document.getElementById('compareTicker1').value = this.currentAnalysisTicker;
         }
+    }
+
+    // News functionality
+    async loadNewsTab(ticker) {
+        const newsContainer = document.getElementById('stockNewsContainer');
+        newsContainer.innerHTML = '<div class="loading-news">Lade Nachrichten...</div>';
+        
+        try {
+            const newsData = await api.getStockNews(ticker, 15, 7);
+            this.currentNewsData = newsData;
+            this.displayStockNews(newsData.news, 'all');
+            
+            // Set up filter buttons
+            this.setupNewsFilters(newsData.news);
+        } catch (error) {
+            console.error('Error loading news:', error);
+            newsContainer.innerHTML = '<div class="error-news">Fehler beim Laden der Nachrichten</div>';
+        }
+    }
+    
+    setupNewsFilters(newsArticles) {
+        const filterButtons = document.querySelectorAll('.news-filters .filter-btn');
+        
+        filterButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Remove active class from all buttons
+                filterButtons.forEach(b => b.classList.remove('active'));
+                
+                // Add active class to clicked button
+                btn.classList.add('active');
+                
+                // Filter news
+                const filter = btn.dataset.filter;
+                this.displayStockNews(newsArticles, filter);
+            });
+        });
+    }
+    
+    displayStockNews(newsArticles, filter = 'all') {
+        const container = document.getElementById('stockNewsContainer');
+        
+        // Filter articles
+        let filteredNews = newsArticles;
+        if (filter !== 'all') {
+            filteredNews = newsArticles.filter(article => 
+                article.sentiment.toLowerCase() === filter.toLowerCase()
+            );
+        }
+        
+        if (filteredNews.length === 0) {
+            container.innerHTML = '<div class="no-news">Keine Nachrichten gefunden</div>';
+            return;
+        }
+        
+        container.innerHTML = filteredNews.map(article => this.createNewsCard(article)).join('');
+    }
+    
+    createNewsCard(article) {
+        const sentimentClass = {
+            'bullish': 'sentiment-bullish',
+            'neutral': 'sentiment-neutral',
+            'bearish': 'sentiment-bearish'
+        }[article.sentiment.toLowerCase()] || 'sentiment-neutral';
+        
+        const sentimentIcon = {
+            'bullish': '🟢',
+            'neutral': '⚪',
+            'bearish': '🔴'
+        }[article.sentiment.toLowerCase()] || '⚪';
+        
+        const timeAgo = this.formatNewsDate(article.date);
+        const imageHtml = article.image ? 
+            `<img src="${article.image}" alt="News thumbnail" class="news-thumbnail">` : '';
+        
+        return `
+            <div class="stock-news-card" onclick="window.open('${article.url}', '_blank')">
+                ${imageHtml}
+                <div class="news-card-content">
+                    <div class="news-card-header">
+                        <span class="sentiment-badge ${sentimentClass}">
+                            ${sentimentIcon} ${article.sentiment}
+                        </span>
+                        <span class="news-source">${article.source}</span>
+                    </div>
+                    <h4 class="news-headline">${article.headline}</h4>
+                    ${article.summary ? `<p class="news-summary">${article.summary}</p>` : ''}
+                    <div class="news-meta">
+                        <span class="news-time">${timeAgo}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    formatNewsDate(dateString) {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+        
+        if (diffHours < 1) return 'vor kurzem';
+        if (diffHours < 24) return `vor ${diffHours} Std`;
+        if (diffDays < 7) return `vor ${diffDays} Tag${diffDays > 1 ? 'en' : ''}`;
+        
+        return date.toLocaleDateString('de-DE');
     }
 
     // Screener functionality

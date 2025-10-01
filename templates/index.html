@@ -44,7 +44,29 @@
                 <a href="#analysis" class="nav-link" data-page="analysis">Analyse</a>
             </div>
 
+            <!-- Global Search Bar -->
+            <div class="global-search">
+                <input 
+                    type="text" 
+                    id="globalSearch" 
+                    class="global-search-input"
+                    placeholder="🔍 Ticker suchen... (Strg+K)" 
+                    autocomplete="off"
+                />
+                <div class="search-dropdown" id="searchDropdown" style="display: none;">
+                    <!-- Dynamically filled by JavaScript -->
+                </div>
+            </div>
+
             <div class="nav-user">
+                <!-- Notification Bell (only when logged in) -->
+                <div class="nav-notifications" id="navNotifications" style="display:none;">
+                    <button class="notification-btn" id="notificationBtn" title="Benachrichtigungen">
+                        <span class="notification-icon">🔔</span>
+                        <span class="notification-badge" id="notificationBadge" style="display:none;">0</span>
+                    </button>
+                </div>
+
                 <span id="userDisplay" class="user-display" style="display:none;">
                     <span id="username"></span>
                     <button class="btn btn-sm btn-outline" onclick="app.logout()">Logout</button>
@@ -56,18 +78,60 @@
         </div>
     </nav>
 
+    <!-- Notification Panel (Dropdown) -->
+    <div class="notification-panel" id="notificationPanel" style="display: none;">
+        <div class="notification-header">
+            <h3>Benachrichtigungen</h3>
+            <button class="mark-all-read" onclick="notificationCenter.markAllRead()">Alle gelesen</button>
+        </div>
+        <div class="notification-list" id="notificationList">
+            <!-- Dynamically filled -->
+        </div>
+        <div class="notification-footer">
+            <a href="#" onclick="app.showPage('alerts'); return false;">Alle Alerts verwalten</a>
+        </div>
+    </div>
+
     <!-- Main Container -->
     <div class="app-container">
         <!-- Dashboard Page -->
         <div id="dashboard-page" class="page active">
             <div class="page-header">
                 <h1>Dashboard</h1>
-                <button class="btn btn-icon" onclick="app.customizeDashboard()" title="Dashboard anpassen">⚙️</button>
+                <button class="btn btn-icon" onclick="dashboard.toggleCustomization()" title="Dashboard anpassen">⚙️</button>
+            </div>
+
+            <!-- Dashboard Customization Panel -->
+            <div class="customization-panel" id="customizationPanel" style="display: none;">
+                <h3>Dashboard anpassen</h3>
+                <p class="text-secondary">Wählen Sie die Widgets aus, die Sie anzeigen möchten:</p>
+                <div class="widget-toggles">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="toggle-portfolio" checked>
+                        <span>📊 Portfolio-Übersicht</span>
+                    </label>
+                    <label class="toggle-label">
+                        <input type="checkbox" id="toggle-watchlist" checked>
+                        <span>👁️ Watchlist</span>
+                    </label>
+                    <label class="toggle-label">
+                        <input type="checkbox" id="toggle-news" checked>
+                        <span>📰 Markt-Nachrichten</span>
+                    </label>
+                    <label class="toggle-label">
+                        <input type="checkbox" id="toggle-ai-recommendations" checked>
+                        <span>🤖 KI-Empfehlungen</span>
+                    </label>
+                </div>
+                <div class="customization-actions">
+                    <button class="btn btn-primary" onclick="dashboard.saveCustomization()">Speichern</button>
+                    <button class="btn btn-outline" onclick="dashboard.resetToDefault()">Zurücksetzen</button>
+                </div>
             </div>
 
             <div class="dashboard-grid" id="dashboardGrid">
                 <!-- Portfolio Widget -->
-                <div class="widget" id="portfolioWidget">
+                <div class="widget" id="portfolio-widget">
                     <div class="widget-header">
                         <h3>Portfolio Performance</h3>
                         <span class="widget-actions">
@@ -96,7 +160,7 @@
                 </div>
 
                 <!-- Watchlist Widget -->
-                <div class="widget" id="watchlistWidget">
+                <div class="widget" id="watchlist-widget">
                     <div class="widget-header">
                         <h3>Watchlist</h3>
                         <span class="widget-actions">
@@ -126,7 +190,7 @@
                 </div>
 
                 <!-- AI Market Analysis Widget -->
-                <div class="widget widget-full" id="aiRecommendationsWidget">
+                <div class="widget widget-full" id="ai-recommendations-widget">
                     <div class="widget-header">
                         <h3>🤖 KI-Marktanalyse: Top Kauf/Verkaufsempfehlungen</h3>
                         <span class="widget-actions">
@@ -149,7 +213,7 @@
                 </div>
 
                 <!-- Market News Widget -->
-                <div class="widget widget-full" id="newsWidget">
+                <div class="widget widget-full" id="news-widget">
                     <div class="widget-header">
                         <h3>📰 Market News</h3>
                         <span class="widget-actions">
@@ -375,6 +439,7 @@
                             <button class="tab-btn" data-analysis-tab="technical">Technisch</button>
                             <button class="tab-btn" data-analysis-tab="fundamental">Fundamental</button>
                             <button class="tab-btn" data-analysis-tab="ai">KI-Analyse</button>
+                            <button class="tab-btn" data-analysis-tab="news">📰 Nachrichten</button>
                             <button class="tab-btn" data-analysis-tab="compare">Vergleich</button>
                         </div>
 
@@ -390,6 +455,23 @@
                             </div>
                             <div id="ai-tab" class="tab-pane">
                                 <!-- KI-Analyse -->
+                            </div>
+                            <div id="news-tab" class="tab-pane">
+                                <!-- Nachrichten -->
+                                <div class="news-container">
+                                    <div class="news-header">
+                                        <h3>📰 Aktuelle Nachrichten</h3>
+                                        <div class="news-filters">
+                                            <button class="filter-btn active" data-filter="all">Alle</button>
+                                            <button class="filter-btn" data-filter="bullish">Bullish 🟢</button>
+                                            <button class="filter-btn" data-filter="neutral">Neutral ⚪</button>
+                                            <button class="filter-btn" data-filter="bearish">Bearish 🔴</button>
+                                        </div>
+                                    </div>
+                                    <div id="stockNewsContainer" class="stock-news-list">
+                                        <!-- Dynamically filled by JavaScript -->
+                                    </div>
+                                </div>
                             </div>
                             <div id="compare-tab" class="tab-pane">
                                 <!-- Aktienvergleich -->
@@ -601,5 +683,10 @@
     
     <!-- Export Manager -->
     <script src="/static/js/export-manager.js"></script>
+    
+    <!-- Phase 3 Part 3: New Features -->
+    <script src="/static/js/global-search.js"></script>
+    <script src="/static/js/notifications.js"></script>
+    <script src="/static/js/dashboard-customizer.js"></script>
 </body>
 </html>

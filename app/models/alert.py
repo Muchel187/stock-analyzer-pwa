@@ -13,6 +13,7 @@ class Alert(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     is_triggered = db.Column(db.Boolean, default=False)
     triggered_at = db.Column(db.DateTime)
+    acknowledged = db.Column(db.Boolean, default=False)  # NEW: For notification center
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_checked = db.Column(db.DateTime)
 
@@ -62,11 +63,17 @@ class Alert(db.Model):
             'ticker': self.ticker,
             'company_name': self.company_name,
             'alert_type': self.alert_type,
+            'condition_type': 'above' if self.alert_type == 'PRICE_ABOVE' else 'below',  # Simplified for frontend
             'target_value': round(self.target_value, 2) if self.target_value else 0,
+            'target_price': round(self.target_value, 2) if self.target_value else 0,  # Alias
             'current_value': round(self.current_value, 2) if self.current_value else None,
+            'current_price': round(self.current_value, 2) if self.current_value else None,  # Alias
+            'last_price': round(self.current_value, 2) if self.current_value else None,  # Another alias
             'is_active': self.is_active,
             'is_triggered': self.is_triggered,
+            'triggered': self.is_triggered,  # Alias
             'triggered_at': self.triggered_at.isoformat() if self.triggered_at else None,
+            'acknowledged': self.acknowledged,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'last_checked': self.last_checked.isoformat() if self.last_checked else None,
             'notify_email': self.notify_email,
