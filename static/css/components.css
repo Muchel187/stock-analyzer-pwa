@@ -1291,11 +1291,19 @@
     margin-top: 2rem;
     padding-top: 1.5rem;
     border-top: 1px solid var(--border-color);
+    height: 200px; /* Fixed height for volume chart */
+    position: relative;
 }
 
 .volume-chart-container h4 {
     margin-bottom: 1rem;
     font-size: 1.1rem;
+}
+
+/* Volume chart canvas wrapper */
+#volumeChart {
+    max-height: 150px !important;
+    height: 150px !important;
 }
 
 /* Stock Comparison Styles */

@@ -1780,8 +1780,10 @@ class StockAnalyzerApp {
                         }
                     },
                     y: {
+                        beginAtZero: true, // Force Y-axis to start at 0
                         ticks: {
                             color: '#9ca3af',
+                            maxTicksLimit: 5, // Limit number of Y-axis ticks
                             callback: function(value) {
                                 return (value / 1000000).toFixed(1) + 'M';
                             }
