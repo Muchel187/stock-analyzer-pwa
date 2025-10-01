@@ -5,6 +5,14 @@ class StockAnalyzerApp {
         this.currentUser = null;
         this.aiVisualizer = new AIAnalysisVisualizer();
         this.currentAnalysisTicker = null;
+        this.currentStockPrice = null;
+        this.currentPeriod = '1y';
+        this.priceChartInstance = null;
+        this.volumeChartInstance = null;
+        this.compareChartInstance = null;
+        this.priceHistoryData = null;
+        this.showSMA50 = false;
+        this.showSMA200 = false;
         this.init();
     }
 
@@ -213,12 +221,18 @@ class StockAnalyzerApp {
         const container = document.getElementById('watchlistItems');
 
         if (items.length === 0) {
-            container.innerHTML = '<p class="text-secondary">Keine Aktien in der Watchlist</p>';
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📊</div>
+                    <div class="empty-state-message">Keine Aktien in der Watchlist</div>
+                    <div class="empty-state-hint">Fügen Sie Aktien über die Analyse-Seite oder den Screener hinzu</div>
+                </div>
+            `;
             return;
         }
 
         container.innerHTML = items.map(item => `
-            <div class="watchlist-item">
+            <div class="watchlist-item clickable" onclick="app.navigateToAnalysis('${item.ticker}')" title="Klicken für Analyse von ${item.ticker}">
                 <div class="watchlist-item-info">
                     <div class="watchlist-item-ticker">${item.ticker}</div>
                     <div class="watchlist-item-name">${item.company_name || ''}</div>
@@ -411,11 +425,29 @@ class StockAnalyzerApp {
         `;
     }
 
-    showStockDetails(ticker) {
-        // Navigate to analysis page and search for the stock
+    /**
+     * Navigate to analysis page and analyze a specific ticker
+     * This is the central method for all ticker navigation across the app
+     */
+    navigateToAnalysis(ticker) {
+        if (!ticker) {
+            this.showNotification('Kein Ticker angegeben', 'error');
+            return;
+        }
+
+        // Navigate to analysis page
         this.showPage('analysis');
-        document.getElementById('stockSearch').value = ticker;
+
+        // Set ticker in search field
+        document.getElementById('stockSearch').value = ticker.toUpperCase();
+
+        // Trigger analysis
         this.analyzeStock();
+    }
+
+    // Alias for backward compatibility
+    showStockDetails(ticker) {
+        this.navigateToAnalysis(ticker);
     }
 
     async refreshAlerts() {
@@ -438,7 +470,13 @@ class StockAnalyzerApp {
         const container = document.getElementById('activeAlerts');
 
         if (alerts.length === 0) {
-            container.innerHTML = '<p class="text-secondary">Keine aktiven Alerts</p>';
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">🔔</div>
+                    <div class="empty-state-message">Keine aktiven Alerts</div>
+                    <div class="empty-state-hint">Erstellen Sie Alerts auf der Alerts-Seite</div>
+                </div>
+            `;
             return;
         }
 
@@ -468,6 +506,7 @@ class StockAnalyzerApp {
 
         const resultDiv = document.getElementById('analysisResult');
         resultDiv.style.display = 'block';
+        resultDiv.classList.add('loading');
 
         try {
             const [stockInfo, aiAnalysis] = await Promise.all([
@@ -475,8 +514,10 @@ class StockAnalyzerApp {
                 this.currentUser ? api.analyzeWithAI(ticker) : Promise.resolve(null)
             ]);
 
+            resultDiv.classList.remove('loading');
             this.displayStockAnalysis(stockInfo, aiAnalysis);
         } catch (error) {
+            resultDiv.classList.remove('loading');
             this.showNotification('Analyse fehlgeschlagen', 'error');
             resultDiv.style.display = 'none';
         }
@@ -516,6 +557,24 @@ class StockAnalyzerApp {
         // Display AI tab
         if (aiAnalysis && aiAnalysis.ai_analysis) {
             document.getElementById('ai-tab').innerHTML = this.createAIContent(aiAnalysis.ai_analysis);
+        }
+
+        // Load interactive price chart
+        this.loadPriceChart(data.ticker, this.currentPeriod);
+
+        // Restore last active tab from localStorage
+        this.restoreLastAnalysisTab();
+    }
+
+    restoreLastAnalysisTab() {
+        const lastTab = localStorage.getItem('lastAnalysisTab');
+        
+        if (lastTab) {
+            // Find the tab button and click it
+            const tabButton = document.querySelector(`[data-analysis-tab="${lastTab}"]`);
+            if (tabButton) {
+                tabButton.click();
+            }
         }
     }
 
@@ -1001,6 +1060,9 @@ class StockAnalyzerApp {
         });
         document.getElementById(`${tab}-tab`).classList.add('active');
 
+        // Save tab preference to localStorage
+        localStorage.setItem('lastAnalysisTab', tab);
+
         // Load AI analysis when AI tab is selected
         if (tab === 'ai' && this.currentAnalysisTicker) {
             this.aiVisualizer.renderAnalysis(this.currentAnalysisTicker, this.currentStockPrice);
@@ -1011,6 +1073,11 @@ class StockAnalyzerApp {
             setTimeout(() => {
                 this.initTechnicalCharts(this.currentTechnicalData);
             }, 100);
+        }
+
+        // Pre-fill first ticker when compare tab is selected
+        if (tab === 'compare' && this.currentAnalysisTicker) {
+            document.getElementById('compareTicker1').value = this.currentAnalysisTicker;
         }
     }
 
@@ -1035,11 +1102,16 @@ class StockAnalyzerApp {
     }
 
     async applyPreset(presetName) {
+        const resultsContainer = document.getElementById('screenerResults');
+        resultsContainer.classList.add('loading');
+
         try {
             const response = await api.applyPresetScreen(presetName);
+            resultsContainer.classList.remove('loading');
             this.displayScreenerResults(response.results);
             document.getElementById('resultCount').textContent = `(${response.count})`;
         } catch (error) {
+            resultsContainer.classList.remove('loading');
             this.showNotification('Preset konnte nicht angewendet werden', 'error');
         }
     }
@@ -1057,11 +1129,16 @@ class StockAnalyzerApp {
             prefer_momentum: document.getElementById('preferMomentum').checked
         };
 
+        const resultsContainer = document.getElementById('screenerResults');
+        resultsContainer.classList.add('loading');
+
         try {
             const response = await api.screenStocks(criteria);
+            resultsContainer.classList.remove('loading');
             this.displayScreenerResults(response.results);
             document.getElementById('resultCount').textContent = `(${response.count})`;
         } catch (error) {
+            resultsContainer.classList.remove('loading');
             this.showNotification('Screening fehlgeschlagen', 'error');
         }
     }
@@ -1070,7 +1147,17 @@ class StockAnalyzerApp {
         const tbody = document.getElementById('screenerTableBody');
 
         if (results.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8">Keine Ergebnisse gefunden</td></tr>';
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🔍</div>
+                            <div class="empty-state-message">Keine Ergebnisse gefunden</div>
+                            <div class="empty-state-hint">Passen Sie Ihre Filterkriterien an oder versuchen Sie ein Preset</div>
+                        </div>
+                    </td>
+                </tr>
+            `;
             return;
         }
 
@@ -1105,10 +1192,15 @@ class StockAnalyzerApp {
             return;
         }
 
+        const container = document.getElementById('portfolioDetails');
+        container.classList.add('loading');
+
         try {
             const portfolio = await api.getPortfolio();
+            container.classList.remove('loading');
             this.displayPortfolioDetails(portfolio);
         } catch (error) {
+            container.classList.remove('loading');
             this.showNotification('Portfolio konnte nicht geladen werden', 'error');
         }
     }
@@ -1139,12 +1231,22 @@ class StockAnalyzerApp {
         // Display holdings
         const tbody = document.getElementById('portfolioTableBody');
         if (portfolio.items.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7">Keine Positionen im Portfolio</td></tr>';
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">💼</div>
+                            <div class="empty-state-message">Keine Positionen im Portfolio</div>
+                            <div class="empty-state-hint">Fügen Sie Transaktionen hinzu, um Ihr Portfolio zu beginnen</div>
+                        </div>
+                    </td>
+                </tr>
+            `;
             return;
         }
 
         tbody.innerHTML = portfolio.items.map(item => `
-            <tr>
+            <tr class="clickable" onclick="app.navigateToAnalysis('${item.ticker}')" style="cursor: pointer;" title="Klicken für Analyse von ${item.ticker}">
                 <td><strong>${item.ticker}</strong></td>
                 <td>${item.company_name}</td>
                 <td>${item.shares}</td>
@@ -1153,7 +1255,7 @@ class StockAnalyzerApp {
                 <td class="${item.gain_loss_percent > 0 ? 'positive' : 'negative'}">
                     ${item.gain_loss_percent > 0 ? '+' : ''}${item.gain_loss_percent?.toFixed(2) || '0'}%
                 </td>
-                <td>
+                <td onclick="event.stopPropagation()">
                     <button class="btn-icon" onclick="app.sellPosition('${item.ticker}')">Verkaufen</button>
                 </td>
             </tr>
@@ -1179,12 +1281,18 @@ class StockAnalyzerApp {
         const container = document.getElementById('watchlistGrid');
 
         if (items.length === 0) {
-            container.innerHTML = '<p>Keine Aktien in der Watchlist</p>';
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">⭐</div>
+                    <div class="empty-state-message">Keine Aktien in der Watchlist</div>
+                    <div class="empty-state-hint">Analysieren Sie Aktien und fügen Sie sie zur Watchlist hinzu</div>
+                </div>
+            `;
             return;
         }
 
         container.innerHTML = items.map(item => `
-            <div class="watchlist-card card">
+            <div class="watchlist-card card clickable" onclick="app.navigateToAnalysis('${item.ticker}')" title="Klicken für Analyse von ${item.ticker}">
                 <h3>${item.ticker}</h3>
                 <p>${item.company_name}</p>
                 <div class="price-info">
@@ -1193,7 +1301,7 @@ class StockAnalyzerApp {
                         ${item.price_change_percent > 0 ? '+' : ''}${item.price_change_percent?.toFixed(2) || '0'}%
                     </span>
                 </div>
-                <div class="watchlist-actions">
+                <div class="watchlist-actions" onclick="event.stopPropagation()">
                     <button class="btn btn-sm btn-outline" onclick="app.createAlertForStock('${item.ticker}')">
                         Alert erstellen
                     </button>
@@ -1246,7 +1354,13 @@ class StockAnalyzerApp {
         const container = document.getElementById('alertsList');
 
         if (alerts.length === 0) {
-            container.innerHTML = '<p>Keine Alerts vorhanden</p>';
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">🔔</div>
+                    <div class="empty-state-message">Keine Alerts vorhanden</div>
+                    <div class="empty-state-hint">Erstellen Sie Alerts für Ihre Watchlist-Aktien</div>
+                </div>
+            `;
             return;
         }
 
@@ -1400,6 +1514,499 @@ class StockAnalyzerApp {
         } catch (error) {
             this.showNotification('Fehler beim Löschen des Alerts', 'error');
         }
+    }
+
+    // Interactive Price Chart Methods
+    async changePricePeriod(period) {
+        if (!this.currentAnalysisTicker) return;
+
+        this.currentPeriod = period;
+
+        // Update active button
+        document.querySelectorAll('.period-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.dataset.period === period) {
+                btn.classList.add('active');
+            }
+        });
+
+        // Reload chart with new period
+        await this.loadPriceChart(this.currentAnalysisTicker, period);
+    }
+
+    async loadPriceChart(ticker, period = '1y') {
+        try {
+            const history = await api.getStockHistory(ticker, period);
+            
+            if (!history || !history.data || history.data.length === 0) {
+                console.error('No price history data available');
+                return;
+            }
+
+            this.priceHistoryData = history;
+
+            // Prepare data for Chart.js
+            const dates = history.data.map(d => d.date);
+            const prices = history.data.map(d => parseFloat(d.close));
+            const volumes = history.data.map(d => parseInt(d.volume));
+
+            // Calculate moving averages if enough data
+            let sma50 = null;
+            let sma200 = null;
+
+            if (prices.length >= 50) {
+                sma50 = this.calculateSMA(prices, 50);
+            }
+
+            if (prices.length >= 200) {
+                sma200 = this.calculateSMA(prices, 200);
+            }
+
+            this.renderPriceChart(dates, prices, sma50, sma200);
+            this.renderVolumeChart(dates, volumes);
+
+        } catch (error) {
+            console.error('Error loading price chart:', error);
+            this.showNotification('Fehler beim Laden des Charts', 'error');
+        }
+    }
+
+    calculateSMA(data, period) {
+        const sma = [];
+        for (let i = 0; i < data.length; i++) {
+            if (i < period - 1) {
+                sma.push(null);
+            } else {
+                const sum = data.slice(i - period + 1, i + 1).reduce((a, b) => a + b, 0);
+                sma.push(sum / period);
+            }
+        }
+        return sma;
+    }
+
+    renderPriceChart(dates, prices, sma50, sma200) {
+        const ctx = document.getElementById('priceChart');
+        if (!ctx) return;
+
+        // Destroy existing chart
+        if (this.priceChartInstance) {
+            this.priceChartInstance.destroy();
+        }
+
+        const datasets = [
+            {
+                label: 'Preis',
+                data: prices,
+                borderColor: '#667eea',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                fill: true,
+                tension: 0.4,
+                borderWidth: 2
+            }
+        ];
+
+        // Add SMA50 if toggled and available
+        if (this.showSMA50 && sma50) {
+            datasets.push({
+                label: 'SMA 50',
+                data: sma50,
+                borderColor: '#10b981',
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                borderDash: [5, 5],
+                pointRadius: 0
+            });
+        }
+
+        // Add SMA200 if toggled and available
+        if (this.showSMA200 && sma200) {
+            datasets.push({
+                label: 'SMA 200',
+                data: sma200,
+                borderColor: '#ef4444',
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                borderDash: [5, 5],
+                pointRadius: 0
+            });
+        }
+
+        this.priceChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: dates,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            color: '#9ca3af',
+                            usePointStyle: true
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(17, 24, 39, 0.95)',
+                        titleColor: '#f3f4f6',
+                        bodyColor: '#d1d5db',
+                        borderColor: '#374151',
+                        borderWidth: 1,
+                        padding: 12,
+                        displayColors: true,
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.y !== null) {
+                                    label += '$' + context.parsed.y.toFixed(2);
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            color: '#9ca3af',
+                            maxTicksLimit: 10
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)'
+                        }
+                    },
+                    y: {
+                        ticks: {
+                            color: '#9ca3af',
+                            callback: function(value) {
+                                return '$' + value.toFixed(2);
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)'
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    renderVolumeChart(dates, volumes) {
+        const ctx = document.getElementById('volumeChart');
+        if (!ctx) return;
+
+        // Destroy existing chart
+        if (this.volumeChartInstance) {
+            this.volumeChartInstance.destroy();
+        }
+
+        this.volumeChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: dates,
+                datasets: [{
+                    label: 'Volumen',
+                    data: volumes,
+                    backgroundColor: 'rgba(102, 126, 234, 0.6)',
+                    borderColor: '#667eea',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(17, 24, 39, 0.95)',
+                        titleColor: '#f3f4f6',
+                        bodyColor: '#d1d5db',
+                        borderColor: '#374151',
+                        borderWidth: 1,
+                        padding: 12,
+                        callbacks: {
+                            label: function(context) {
+                                return 'Volumen: ' + context.parsed.y.toLocaleString();
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            color: '#9ca3af',
+                            maxTicksLimit: 10
+                        },
+                        grid: {
+                            display: false
+                        }
+                    },
+                    y: {
+                        ticks: {
+                            color: '#9ca3af',
+                            callback: function(value) {
+                                return (value / 1000000).toFixed(1) + 'M';
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)'
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    toggleMovingAverage(type) {
+        if (type === 'sma50') {
+            this.showSMA50 = document.getElementById('toggleSMA50').checked;
+        } else if (type === 'sma200') {
+            this.showSMA200 = document.getElementById('toggleSMA200').checked;
+        }
+
+        // Reload chart with updated MA visibility
+        if (this.priceHistoryData) {
+            const dates = this.priceHistoryData.data.map(d => d.date);
+            const prices = this.priceHistoryData.data.map(d => parseFloat(d.close));
+            const volumes = this.priceHistoryData.data.map(d => parseInt(d.volume));
+
+            let sma50 = null;
+            let sma200 = null;
+
+            if (prices.length >= 50) {
+                sma50 = this.calculateSMA(prices, 50);
+            }
+
+            if (prices.length >= 200) {
+                sma200 = this.calculateSMA(prices, 200);
+            }
+
+            this.renderPriceChart(dates, prices, sma50, sma200);
+        }
+    }
+
+    // Stock Comparison Methods
+    async runComparison() {
+        const ticker1 = document.getElementById('compareTicker1').value.trim().toUpperCase();
+        const ticker2 = document.getElementById('compareTicker2').value.trim().toUpperCase();
+        const ticker3 = document.getElementById('compareTicker3').value.trim().toUpperCase();
+        const ticker4 = document.getElementById('compareTicker4').value.trim().toUpperCase();
+        const period = document.getElementById('comparePeriod').value;
+
+        const tickers = [ticker1, ticker2];
+        if (ticker3) tickers.push(ticker3);
+        if (ticker4) tickers.push(ticker4);
+
+        if (tickers.length < 2) {
+            this.showNotification('Bitte geben Sie mindestens 2 Ticker ein', 'error');
+            return;
+        }
+
+        const resultsContainer = document.getElementById('compareResults');
+        resultsContainer.style.display = 'block';
+        resultsContainer.classList.add('loading');
+
+        try {
+            const comparisonData = await api.compareStocks(tickers, period);
+            resultsContainer.classList.remove('loading');
+            
+            this.displayComparisonTable(comparisonData.comparison);
+            this.renderComparisonChart(comparisonData.price_histories);
+            
+        } catch (error) {
+            resultsContainer.classList.remove('loading');
+            this.showNotification('Vergleich fehlgeschlagen: ' + error.message, 'error');
+        }
+    }
+
+    displayComparisonTable(comparison) {
+        const tableContainer = document.getElementById('compareTable');
+        
+        if (!comparison || comparison.length === 0) {
+            tableContainer.innerHTML = '<p class="text-secondary">Keine Vergleichsdaten verfügbar</p>';
+            return;
+        }
+
+        // Create table
+        let html = `
+            <div class="compare-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Kennzahl</th>
+                            ${comparison.map(stock => `<th>${stock.ticker}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="metric-name">Unternehmen</td>
+                            ${comparison.map(stock => `<td>${stock.company_name || '-'}</td>`).join('')}
+                        </tr>
+                        <tr>
+                            <td class="metric-name">Aktueller Preis</td>
+                            ${comparison.map(stock => `<td>$${stock.current_price?.toFixed(2) || '-'}</td>`).join('')}
+                        </tr>
+                        <tr>
+                            <td class="metric-name">Marktkapitalisierung</td>
+                            ${comparison.map(stock => `<td>${stock.market_cap ? '$' + (stock.market_cap / 1e9).toFixed(2) + 'B' : '-'}</td>`).join('')}
+                        </tr>
+                        <tr>
+                            <td class="metric-name">KGV (P/E)</td>
+                            ${comparison.map(stock => `<td>${stock.pe_ratio?.toFixed(2) || '-'}</td>`).join('')}
+                        </tr>
+                        <tr>
+                            <td class="metric-name">Dividendenrendite</td>
+                            ${comparison.map(stock => `<td>${stock.dividend_yield ? (stock.dividend_yield * 100).toFixed(2) + '%' : '-'}</td>`).join('')}
+                        </tr>
+                        <tr>
+                            <td class="metric-name">Sektor</td>
+                            ${comparison.map(stock => `<td>${stock.sector || '-'}</td>`).join('')}
+                        </tr>
+                        <tr>
+                            <td class="metric-name">RSI</td>
+                            ${comparison.map(stock => `<td>${stock.rsi?.toFixed(2) || '-'}</td>`).join('')}
+                        </tr>
+                        <tr>
+                            <td class="metric-name">Volatilität</td>
+                            ${comparison.map(stock => `<td>${stock.volatility ? (stock.volatility * 100).toFixed(2) + '%' : '-'}</td>`).join('')}
+                        </tr>
+                        <tr>
+                            <td class="metric-name">1M Änderung</td>
+                            ${comparison.map(stock => {
+                                const change = stock.price_change_1m;
+                                if (change === null || change === undefined) return '<td>-</td>';
+                                const cssClass = change > 0 ? 'positive' : 'negative';
+                                return `<td class="${cssClass}">${change > 0 ? '+' : ''}${change.toFixed(2)}%</td>`;
+                            }).join('')}
+                        </tr>
+                        <tr>
+                            <td class="metric-name">Volumen</td>
+                            ${comparison.map(stock => `<td>${stock.volume ? stock.volume.toLocaleString() : '-'}</td>`).join('')}
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        `;
+
+        tableContainer.innerHTML = html;
+    }
+
+    renderComparisonChart(priceHistories) {
+        const ctx = document.getElementById('compareChart');
+        if (!ctx) return;
+
+        // Destroy existing chart
+        if (this.compareChartInstance) {
+            this.compareChartInstance.destroy();
+        }
+
+        if (!priceHistories || priceHistories.length === 0) {
+            return;
+        }
+
+        // Use the dates from the first ticker
+        const dates = priceHistories[0].data.map(d => d.date);
+
+        // Color palette for different stocks
+        const colors = [
+            '#667eea', // Purple
+            '#10b981', // Green
+            '#ef4444', // Red
+            '#f59e0b'  // Orange
+        ];
+
+        const datasets = priceHistories.map((history, index) => ({
+            label: history.ticker,
+            data: history.data.map(d => d.normalized),
+            borderColor: colors[index % colors.length],
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            tension: 0.4,
+            pointRadius: 0,
+            pointHoverRadius: 4
+        }));
+
+        this.compareChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: dates,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            color: '#9ca3af',
+                            usePointStyle: true,
+                            padding: 15
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(17, 24, 39, 0.95)',
+                        titleColor: '#f3f4f6',
+                        bodyColor: '#d1d5db',
+                        borderColor: '#374151',
+                        borderWidth: 1,
+                        padding: 12,
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.y !== null) {
+                                    const sign = context.parsed.y >= 0 ? '+' : '';
+                                    label += sign + context.parsed.y.toFixed(2) + '%';
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            color: '#9ca3af',
+                            maxTicksLimit: 10
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)'
+                        }
+                    },
+                    y: {
+                        ticks: {
+                            color: '#9ca3af',
+                            callback: function(value) {
+                                return value.toFixed(1) + '%';
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)'
+                        }
+                    }
+                }
+            }
+        });
     }
 }
 

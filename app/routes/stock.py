@@ -278,11 +278,11 @@ def get_ai_recommendations():
                 technical = StockService.calculate_technical_indicators(ticker)
 
                 # Get AI analysis
-                ai_analysis = AIService.analyze_stock(
-                    ticker=ticker,
-                    stock_info=stock_info,
-                    fundamental_analysis=fundamental,
-                    technical_indicators=technical
+                ai_service = AIService()
+                ai_analysis = ai_service.analyze_stock_with_ai(
+                    stock_info,
+                    technical,
+                    fundamental
                 )
 
                 if ai_analysis and ai_analysis.get('ai_analysis'):
@@ -333,3 +333,98 @@ def get_ai_recommendations():
 
     except Exception as e:
         return jsonify({'error': f'Failed to generate AI recommendations: {str(e)}'}), 500
+
+@bp.route('/compare', methods=['POST'])
+def compare_stocks():
+    """Compare multiple stocks (2-4 tickers)"""
+    try:
+        data = request.get_json()
+        tickers = data.get('tickers', [])
+
+        if not tickers:
+            return jsonify({'error': 'Tickers list is required'}), 400
+
+        if len(tickers) < 2:
+            return jsonify({'error': 'At least 2 tickers required for comparison'}), 400
+
+        if len(tickers) > 4:
+            return jsonify({'error': 'Maximum 4 tickers allowed for comparison'}), 400
+
+        period = data.get('period', '1y')
+        valid_periods = ['1mo', '3mo', '6mo', '1y', '2y', '5y', 'max']
+        
+        if period not in valid_periods:
+            period = '1y'
+
+        # Get data for all tickers
+        comparison_data = []
+        price_histories = []
+
+        for ticker in tickers:
+            try:
+                # Get basic stock info
+                stock_info = StockService.get_stock_info(ticker)
+                if not stock_info:
+                    continue
+
+                # Get fundamental analysis
+                fundamental = StockService.get_fundamental_analysis(ticker)
+
+                # Get technical indicators
+                technical = StockService.calculate_technical_indicators(ticker)
+
+                # Get price history
+                history = StockService.get_price_history(ticker, period)
+
+                comparison_data.append({
+                    'ticker': ticker.upper(),
+                    'company_name': stock_info.get('company_name', ticker),
+                    'current_price': stock_info.get('current_price'),
+                    'market_cap': stock_info.get('market_cap'),
+                    'pe_ratio': stock_info.get('pe_ratio'),
+                    'dividend_yield': stock_info.get('dividend_yield'),
+                    'sector': stock_info.get('sector'),
+                    'industry': stock_info.get('industry'),
+                    'overall_score': fundamental.get('overall_score') if fundamental else None,
+                    'rsi': technical.get('rsi') if technical else None,
+                    'volatility': technical.get('volatility') if technical else None,
+                    'price_change_1m': technical.get('price_change_1m') if technical else None,
+                    'volume': stock_info.get('volume')
+                })
+
+                if history and history.get('data'):
+                    # Normalize price history for comparison (percentage change from start)
+                    hist_data = history['data']
+                    if len(hist_data) > 0:
+                        start_price = float(hist_data[0]['close'])
+                        normalized_data = []
+                        
+                        for point in hist_data:
+                            normalized_data.append({
+                                'date': point['date'],
+                                'close': float(point['close']),
+                                'normalized': ((float(point['close']) - start_price) / start_price * 100),
+                                'volume': int(point.get('volume', 0))
+                            })
+
+                        price_histories.append({
+                            'ticker': ticker.upper(),
+                            'data': normalized_data
+                        })
+
+            except Exception as e:
+                logger.error(f"Error comparing {ticker}: {str(e)}")
+                continue
+
+        if len(comparison_data) < 2:
+            return jsonify({'error': 'Could not fetch data for at least 2 tickers'}), 404
+
+        return jsonify({
+            'comparison': comparison_data,
+            'price_histories': price_histories,
+            'period': period,
+            'timestamp': datetime.utcnow().isoformat()
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': f'Failed to compare stocks: {str(e)}'}), 500

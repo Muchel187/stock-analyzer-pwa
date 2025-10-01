@@ -936,6 +936,30 @@
     display: inline-block;
 }
 
+/* Generic empty state styling */
+.empty-state {
+    text-align: center;
+    padding: 2rem 1.5rem;
+    color: var(--text-secondary);
+}
+
+.empty-state-icon {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.empty-state-message {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.empty-state-hint {
+    font-size: 0.875rem;
+    color: var(--text-tertiary);
+    margin-top: 0.5rem;
+}
+
 .placeholder-note,
 .loading-note,
 .error-note {
@@ -1183,4 +1207,254 @@
     margin: 0.5rem 0;
     color: var(--text-secondary);
     font-size: 0.9rem;
+}
+
+/* Interactive Price Chart Styles */
+.chart-container {
+    padding: 1.5rem;
+}
+
+.chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.chart-header h3 {
+    margin: 0;
+    font-size: 1.3rem;
+}
+
+.chart-controls {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.period-buttons {
+    display: flex;
+    gap: 0.5rem;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 0.25rem;
+    border-radius: 8px;
+}
+
+.period-btn {
+    padding: 0.5rem 1rem;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+}
+
+.period-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+}
+
+.period-btn.active {
+    background: var(--primary-color);
+    color: white;
+}
+
+.chart-toggles {
+    display: flex;
+    gap: 1rem;
+}
+
+.toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.toggle-label input[type="checkbox"] {
+    cursor: pointer;
+}
+
+.toggle-label:hover {
+    color: var(--text-primary);
+}
+
+.volume-chart-container {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.volume-chart-container h4 {
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+/* Stock Comparison Styles */
+.compare-container {
+    padding: 1.5rem;
+}
+
+.compare-header {
+    margin-bottom: 2rem;
+}
+
+.compare-header h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.5rem;
+}
+
+.compare-input-section {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+}
+
+.compare-ticker-inputs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.compare-ticker-input {
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 1rem;
+    text-transform: uppercase;
+}
+
+.compare-ticker-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.compare-period-selector {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.compare-period-selector label {
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.period-select {
+    padding: 0.5rem 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.period-select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.compare-results {
+    margin-top: 2rem;
+}
+
+.compare-metrics-table {
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.compare-metrics-table h4 {
+    margin: 0 0 1rem 0;
+    font-size: 1.2rem;
+}
+
+.compare-table {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.compare-table table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.compare-table th,
+.compare-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.compare-table th {
+    background: rgba(255, 255, 255, 0.05);
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    text-transform: uppercase;
+}
+
+.compare-table td {
+    color: var(--text-primary);
+}
+
+.compare-table .metric-name {
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.compare-table .positive {
+    color: #10b981;
+}
+
+.compare-table .negative {
+    color: #ef4444;
+}
+
+.compare-chart-card {
+    padding: 1.5rem;
+}
+
+.compare-chart-card h4 {
+    margin: 0 0 1.5rem 0;
+    font-size: 1.2rem;
+}
+
+@media (max-width: 768px) {
+    .chart-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .chart-controls {
+        width: 100%;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .period-buttons {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .period-btn {
+        padding: 0.4rem 0.6rem;
+        font-size: 0.75rem;
+    }
+
+    .compare-ticker-inputs {
+        grid-template-columns: 1fr;
+    }
 }

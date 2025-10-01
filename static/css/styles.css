@@ -472,8 +472,37 @@ body {
     }
 }
 
+/* Chart Styles */
+#priceChart {
+    height: 400px;
+}
+
+#volumeChart {
+    height: 200px;
+}
+
+#compareChart {
+    height: 450px;
+}
+
+canvas {
+    max-width: 100%;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
+    #priceChart {
+        height: 300px;
+    }
+
+    #volumeChart {
+        height: 150px;
+    }
+
+    #compareChart {
+        height: 350px;
+    }
+
     .nav-container {
         padding: 1rem;
     }
@@ -515,4 +544,18 @@ body {
     .modal {
         width: 95%;
     }
+}
+/* Clickable items */
+.clickable {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.clickable:hover {
+    transform: translateX(5px);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.clickable:active {
+    transform: translateX(3px);
 }

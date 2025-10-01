@@ -258,6 +258,14 @@ class APIService {
             method: 'POST'
         });
     }
+
+    // Stock Comparison endpoint
+    async compareStocks(tickers, period = '1y') {
+        return await this.request('/stock/compare', {
+            method: 'POST',
+            body: JSON.stringify({ tickers, period })
+        });
+    }
 }
 
 // Create global API instance

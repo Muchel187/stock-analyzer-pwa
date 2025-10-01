@@ -525,3 +525,231 @@ Project-specific documentation files:
 - Displays in prominent meter with color coding (green positive, red negative)
 - Shown in recommendation section of AI analysis
 
+## Phase 2: Interactive Charts & Stock Comparison (NEW - October 2025)
+
+**Location:** Analysis page, integrated into existing tabs plus new Vergleich tab
+
+### Interactive Price Chart Features
+
+**Period Selector Buttons:** 1M, 3M, 6M, 1J, 2J, 5J, Max
+- Clicking a period button reloads chart with new data
+- Active button highlighted with primary color
+- Period state stored in `this.currentPeriod`
+
+**Moving Average Overlays:** Toggleable SMA 50 (green) and SMA 200 (red)
+- Checkbox toggles above chart
+- MAs calculated client-side using `calculateSMA()` method
+- Only shown when sufficient historical data available (50+ or 200+ days)
+- State persists when changing periods
+
+**Volume Chart:** Bar chart below price chart
+- Purple/blue bars showing daily trading volume
+- Y-axis formatted in millions (M)
+- Synchronized dates with price chart
+- Separate Chart.js instance
+
+**Chart.js Implementation:**
+- Responsive line chart with gradient fill for price
+- Dark theme compatible tooltips
+- Grid lines with transparency
+- Smooth line tension (0.4)
+- Hover interactions show date and values
+
+**Dynamic Updates:**
+- Charts reload when period changes
+- MAs recalculated when toggled
+- Old chart instances properly destroyed before recreation
+
+### Stock Comparison Feature
+
+**Compare 2-4 Stocks:** New "Vergleich" tab in analysis page
+- Input fields for 4 tickers (2 required, 2 optional)
+- Period dropdown (1mo, 3mo, 6mo, 1y, 2y, 5y)
+- First ticker pre-filled with current analysis stock
+- "Vergleichen" button triggers comparison
+
+**Comparison Metrics Table:**
+- Displays key metrics in table format
+- Rows include:
+  - Company name
+  - Current price
+  - Market capitalization (in billions)
+  - P/E ratio
+  - Dividend yield (%)
+  - Sector
+  - RSI (technical indicator)
+  - Volatility (annualized %)
+  - 1-month price change (color-coded)
+  - Trading volume
+- Responsive table with horizontal scroll on mobile
+- Missing values displayed as "-"
+
+**Normalized Price Chart:**
+- Line chart showing % change from start for all stocks
+- Each ticker has unique color (purple, green, red, orange)
+- All lines start at 0% for easy comparison
+- Legend shows ticker names with colors
+- Tooltip displays ticker and percentage change
+- Y-axis formatted as percentage
+- Chart height: 450px
+
+### Backend Implementation
+
+**Endpoint:** `POST /api/stock/compare`
+
+**Parameters:**
+- `tickers` (array, required): 2-4 stock tickers
+- `period` (string, optional): Historical period (default: '1y')
+
+**Response Structure:**
+```json
+{
+  "comparison": [
+    {
+      "ticker": "AAPL",
+      "company_name": "Apple Inc",
+      "current_price": 255.52,
+      "market_cap": 3778808.49,
+      "pe_ratio": null,
+      "dividend_yield": null,
+      "sector": "Technology",
+      "industry": "Consumer Electronics",
+      "overall_score": 56.25,
+      "rsi": 81.68,
+      "volatility": 0.367,
+      "price_change_1m": 6.49,
+      "volume": 42263900
+    }
+  ],
+  "price_histories": [
+    {
+      "ticker": "AAPL",
+      "data": [
+        {
+          "date": "2025-08-20",
+          "close": 226.01,
+          "normalized": 0.0,
+          "volume": 42263900
+        }
+      ]
+    }
+  ],
+  "period": "1y",
+  "timestamp": "2025-10-01T..."
+}
+```
+
+**Validation:**
+- Minimum 2 tickers required (returns 400 error)
+- Maximum 4 tickers allowed (returns 400 error)
+- Invalid tickers skipped (continues with valid ones)
+- At least 2 valid tickers needed for response
+
+**Data Processing:**
+- Fetches stock info, fundamentals, and technical data for each ticker
+- Retrieves historical price data for specified period
+- Normalizes price data: `((price - start_price) / start_price * 100)`
+- Returns both absolute and normalized data
+
+### Frontend Implementation
+
+**Key Methods in `app.js`:**
+
+- `loadPriceChart(ticker, period)` - Main method to load and render price/volume charts
+- `changePricePeriod(period)` - Handles period button clicks, updates active state
+- `toggleMovingAverage(type)` - Shows/hides SMA50 or SMA200 overlays
+- `calculateSMA(data, period)` - Computes simple moving average client-side
+- `renderPriceChart(dates, prices, sma50, sma200)` - Creates Chart.js price chart
+- `renderVolumeChart(dates, volumes)` - Creates Chart.js volume bar chart
+- `runComparison()` - Triggers stock comparison API call
+- `displayComparisonTable(comparison)` - Renders metrics table HTML
+- `renderComparisonChart(priceHistories)` - Creates normalized line chart
+
+**Chart Instance Management:**
+- `this.priceChartInstance` - Main price chart
+- `this.volumeChartInstance` - Volume bar chart
+- `this.compareChartInstance` - Comparison line chart
+- All instances destroyed before recreation to prevent memory leaks
+
+**State Management:**
+- `this.currentPeriod` - Currently selected period (default: '1y')
+- `this.priceHistoryData` - Cached historical data for MA recalculation
+- `this.showSMA50` - Boolean for SMA50 visibility
+- `this.showSMA200` - Boolean for SMA200 visibility
+
+**API Integration (`api.js`):**
+- `async compareStocks(tickers, period)` - Calls `/api/stock/compare`
+- Returns comparison data and price histories
+
+### CSS Styling (`static/css/components.css`)
+
+**New Styles Added:**
+- `.chart-container` - Main chart wrapper with padding
+- `.chart-header` - Flexbox header with title and controls
+- `.chart-controls` - Container for period buttons and toggles
+- `.period-buttons` - Button group with background and rounded corners
+- `.period-btn` - Individual period button with hover and active states
+- `.chart-toggles` - Checkbox labels for MA toggles
+- `.toggle-label` - Styled checkbox labels with hover effects
+- `.volume-chart-container` - Volume chart section with border-top
+- `.compare-container` - Main comparison section wrapper
+- `.compare-input-section` - Input area with background and padding
+- `.compare-ticker-inputs` - Grid layout for ticker inputs
+- `.compare-ticker-input` - Styled input fields (uppercase transform)
+- `.compare-metrics-table` - Table container with responsive scroll
+- `.compare-chart-card` - Chart card with padding and title
+
+**Responsive Design:**
+- Mobile breakpoints for smaller chart heights
+- Grid layout adapts to single column on mobile
+- Period buttons compress on small screens
+- Table scrolls horizontally when needed
+
+### Integration Points
+
+**Analysis Page Flow:**
+1. User analyzes stock (e.g., "AAPL")
+2. Stock data loaded and displayed in tabs
+3. Price chart automatically loads with 1Y period
+4. User can change period or toggle MAs
+5. User switches to "Vergleich" tab
+6. First ticker pre-filled with "AAPL"
+7. User enters additional tickers
+8. Comparison runs and displays results
+
+**Tab Persistence:**
+- If user previously viewed "Vergleich" tab, it remains active
+- localStorage key: `'lastAnalysisTab'`
+- Restored in `restoreLastAnalysisTab()` method
+
+**Loading States:**
+- Price chart shows loading spinner during API call
+- Comparison results show loading spinner during fetch
+- Errors display notification toast
+
+### Performance Considerations
+
+- **Client-side MA Calculation:** Reduces server load, instant toggle response
+- **Chart.js 4.x:** Efficient canvas rendering, handles large datasets well
+- **Data Caching:** Historical data cached at StockService level
+- **Chart Destruction:** Prevents memory leaks by destroying old instances
+- **Normalized Data Server-side:** Reduces client-side computation
+- **Lazy Loading:** Charts only render when tab is visible
+
+### Known Limitations
+
+**API Rate Limits:**
+- Alpha Vantage: 25 requests/day for historical data
+- Finnhub: 60 requests/minute for quotes
+- After limits reached, cached data used or errors returned
+
+**Data Availability:**
+- Some stocks may not have 200 days of history for SMA200
+- German stocks (.DE suffix) may have limited Finnhub support
+- Missing fundamental data shows "-" in comparison table
+
+**Browser Compatibility:**
+- Requires Chart.js 4.x
+- Canvas support required (all modern browsers)
+- localStorage required for tab persistence
+
