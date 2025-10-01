@@ -9,15 +9,17 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
 
     # Database
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///stockanalyzer.db'
+    DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///stockanalyzer.db')
     
-    # Fix for Render.com DATABASE_URL format issues
-    if SQLALCHEMY_DATABASE_URI.startswith('DATABASE_URL='):
-        SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI.replace('DATABASE_URL=', '', 1)
+    # Fix for Render.com DATABASE_URL format issues (remove "DATABASE_URL=" prefix if present)
+    if DATABASE_URL and '=' in DATABASE_URL and DATABASE_URL.startswith('DATABASE_URL='):
+        DATABASE_URL = DATABASE_URL.split('=', 1)[1]
     
     # Fix for Heroku postgres:// vs postgresql://
-    if SQLALCHEMY_DATABASE_URI.startswith('postgres://'):
-        SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI.replace('postgres://', 'postgresql://', 1)
+    if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
+        DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+    
+    SQLALCHEMY_DATABASE_URI = DATABASE_URL
     
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
