@@ -1,4 +1,3 @@
-import yfinance as yf
 import pandas as pd
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
@@ -35,18 +34,12 @@ class ScreenerService:
             # Get list of stocks to screen
             stocks_to_screen = cls._get_stocks_to_screen(criteria.get('market', 'USA'))
 
-            # Apply screening in parallel
+            # Screen sequentially (parallel execution causes Flask app context issues)
             screened_stocks = []
-            with ThreadPoolExecutor(max_workers=10) as executor:
-                futures = {
-                    executor.submit(cls._screen_single_stock, ticker, criteria): ticker
-                    for ticker in stocks_to_screen
-                }
-
-                for future in as_completed(futures):
-                    result = future.result()
-                    if result:
-                        screened_stocks.append(result)
+            for ticker in stocks_to_screen:
+                result = cls._screen_single_stock(ticker, criteria)
+                if result:
+                    screened_stocks.append(result)
 
             # Sort by the specified sort criterion
             sort_by = criteria.get('sort_by', 'market_cap')
@@ -75,8 +68,8 @@ class ScreenerService:
     def _screen_single_stock(cls, ticker: str, criteria: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Screen a single stock against criteria"""
         try:
-            stock = yf.Ticker(ticker)
-            info = stock.info
+            # Use StockService to get stock info (uses Finnhub/Alpha Vantage)
+            info = StockService.get_stock_info(ticker)
 
             if not info:
                 return None
@@ -84,27 +77,27 @@ class ScreenerService:
             # Extract metrics
             metrics = {
                 'ticker': ticker,
-                'company_name': info.get('longName', info.get('shortName', ticker)),
+                'company_name': info.get('company_name', ticker),
                 'sector': info.get('sector', 'Unknown'),
                 'industry': info.get('industry', 'Unknown'),
-                'market_cap': info.get('marketCap', 0),
-                'pe_ratio': info.get('trailingPE'),
-                'forward_pe': info.get('forwardPE'),
-                'peg_ratio': info.get('pegRatio'),
-                'dividend_yield': info.get('dividendYield'),
-                'price_to_book': info.get('priceToBook'),
-                'debt_to_equity': info.get('debtToEquity'),
-                'current_ratio': info.get('currentRatio'),
-                'profit_margin': info.get('profitMargins'),
-                'return_on_equity': info.get('returnOnEquity'),
-                'revenue_growth': info.get('revenueGrowth'),
-                'earnings_growth': info.get('earningsGrowth'),
+                'market_cap': info.get('market_cap', 0),
+                'pe_ratio': info.get('pe_ratio'),
+                'forward_pe': info.get('forward_pe'),
+                'peg_ratio': info.get('peg_ratio'),
+                'dividend_yield': info.get('dividend_yield'),
+                'price_to_book': info.get('price_to_book'),
+                'debt_to_equity': info.get('debt_to_equity'),
+                'current_ratio': info.get('current_ratio'),
+                'profit_margin': info.get('profit_margin'),
+                'return_on_equity': info.get('return_on_equity'),
+                'revenue_growth': info.get('revenue_growth'),
+                'earnings_growth': info.get('earnings_growth'),
                 'beta': info.get('beta'),
-                'current_price': info.get('currentPrice') or info.get('regularMarketPrice'),
+                'current_price': info.get('current_price'),
                 'volume': info.get('volume'),
-                'avg_volume': info.get('averageVolume'),
-                '52_week_low': info.get('fiftyTwoWeekLow'),
-                '52_week_high': info.get('fiftyTwoWeekHigh')
+                'avg_volume': info.get('avg_volume'),
+                '52_week_low': info.get('52_week_low'),
+                '52_week_high': info.get('52_week_high')
             }
 
             # Apply filters

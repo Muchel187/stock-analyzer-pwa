@@ -11,8 +11,7 @@ python-dotenv==1.0.0
 SQLAlchemy==2.0.23
 psycopg2-binary==2.9.9
 
-# Financial Data
-yfinance==0.2.33
+# Financial Data (using Finnhub and Alpha Vantage APIs instead of yfinance)
 pandas==2.1.4
 numpy==1.26.2
 

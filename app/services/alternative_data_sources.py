@@ -16,6 +16,57 @@ class AlphaVantageService:
     BASE_URL = "https://www.alphavantage.co/query"
 
     @staticmethod
+    def get_time_series_daily(ticker: str, outputsize: str = "compact") -> Optional[Dict[str, Any]]:
+        """Get daily time series data from Alpha Vantage"""
+        api_key = os.getenv('ALPHA_VANTAGE_API_KEY')
+        if not api_key:
+            logger.warning("Alpha Vantage API key not configured")
+            return None
+
+        try:
+            params = {
+                'function': 'TIME_SERIES_DAILY',
+                'symbol': ticker.upper(),
+                'outputsize': outputsize,  # 'compact' = 100 days, 'full' = 20+ years
+                'apikey': api_key
+            }
+
+            response = requests.get(AlphaVantageService.BASE_URL, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+
+            if 'Time Series (Daily)' not in data:
+                logger.warning(f"No time series data from Alpha Vantage for {ticker}")
+                if 'Note' in data:
+                    logger.warning(f"Alpha Vantage note: {data['Note']}")
+                return None
+
+            time_series = data['Time Series (Daily)']
+
+            # Transform to our standard format
+            history_data = []
+            for date_str in sorted(time_series.keys()):  # Sort to get chronological order
+                day_data = time_series[date_str]
+                history_data.append({
+                    'date': date_str,
+                    'open': float(day_data.get('1. open', 0)),
+                    'high': float(day_data.get('2. high', 0)),
+                    'low': float(day_data.get('3. low', 0)),
+                    'close': float(day_data.get('4. close', 0)),
+                    'volume': int(day_data.get('5. volume', 0))
+                })
+
+            return {
+                'ticker': ticker.upper(),
+                'data': history_data,
+                'source': 'alpha_vantage'
+            }
+
+        except Exception as e:
+            logger.error(f"Alpha Vantage time series error for {ticker}: {str(e)}")
+            return None
+
+    @staticmethod
     def get_stock_quote(ticker: str) -> Optional[Dict[str, Any]]:
         """Get real-time stock quote from Alpha Vantage"""
         api_key = os.getenv('ALPHA_VANTAGE_API_KEY')
@@ -194,6 +245,50 @@ class TwelveDataService:
     BASE_URL = "https://api.twelvedata.com"
 
     @staticmethod
+    def get_time_series(ticker: str, interval: str = "1day", outputsize: int = 30) -> Optional[Dict[str, Any]]:
+        """Get historical time series data from Twelve Data"""
+        api_key = os.getenv('TWELVE_DATA_API_KEY')
+        if not api_key:
+            return None
+
+        try:
+            params = {
+                'symbol': ticker.upper(),
+                'interval': interval,
+                'outputsize': outputsize,
+                'apikey': api_key
+            }
+
+            response = requests.get(f"{TwelveDataService.BASE_URL}/time_series", params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+
+            if 'values' not in data or not data['values']:
+                return None
+
+            # Transform to our standard format
+            history_data = []
+            for item in reversed(data['values']):  # Reverse to get chronological order
+                history_data.append({
+                    'date': item.get('datetime'),
+                    'open': float(item.get('open', 0)),
+                    'high': float(item.get('high', 0)),
+                    'low': float(item.get('low', 0)),
+                    'close': float(item.get('close', 0)),
+                    'volume': int(item.get('volume', 0))
+                })
+
+            return {
+                'ticker': ticker.upper(),
+                'data': history_data,
+                'source': 'twelve_data'
+            }
+
+        except Exception as e:
+            logger.error(f"Twelve Data time series error for {ticker}: {str(e)}")
+            return None
+
+    @staticmethod
     def get_stock_quote(ticker: str) -> Optional[Dict[str, Any]]:
         """Get real-time stock quote from Twelve Data"""
         api_key = os.getenv('TWELVE_DATA_API_KEY')
@@ -282,6 +377,33 @@ class FallbackDataService:
             if data:
                 return data
 
+        return None
+
+    @staticmethod
+    def get_historical_data(ticker: str, outputsize: int = 30) -> Optional[Dict[str, Any]]:
+        """Try to get historical price data from available sources"""
+        # Try Alpha Vantage first (more reliable)
+        if os.getenv('ALPHA_VANTAGE_API_KEY'):
+            logger.info(f"Trying Alpha Vantage for historical data: {ticker}")
+            # Alpha Vantage uses 'compact' (100 days) or 'full' (20+ years)
+            av_outputsize = "full" if outputsize > 100 else "compact"
+            data = AlphaVantageService.get_time_series_daily(ticker, outputsize=av_outputsize)
+            if data:
+                logger.info(f"Successfully fetched historical data for {ticker} from Alpha Vantage")
+                # Limit to requested outputsize
+                if len(data['data']) > outputsize:
+                    data['data'] = data['data'][-outputsize:]
+                return data
+
+        # Try Twelve Data as fallback
+        if os.getenv('TWELVE_DATA_API_KEY'):
+            logger.info(f"Trying Twelve Data for historical data: {ticker}")
+            data = TwelveDataService.get_time_series(ticker, outputsize=outputsize)
+            if data:
+                logger.info(f"Successfully fetched historical data for {ticker} from Twelve Data")
+                return data
+
+        logger.warning(f"No fallback source available for historical data: {ticker}")
         return None
 
     @staticmethod

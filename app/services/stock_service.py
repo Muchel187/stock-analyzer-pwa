@@ -1,4 +1,3 @@
-import yfinance as yf
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
@@ -6,7 +5,7 @@ from typing import Dict, List, Optional, Any
 from app.models import StockCache
 from app import cache
 import logging
-from app.services.alternative_data_sources import FallbackDataService
+from app.services.alternative_data_sources import FallbackDataService, AlphaVantageService
 
 logger = logging.getLogger(__name__)
 
@@ -15,86 +14,17 @@ class StockService:
 
     @staticmethod
     def get_stock_info(ticker: str) -> Optional[Dict[str, Any]]:
-        """Get comprehensive stock information with fallback sources"""
+        """Get comprehensive stock information using Finnhub and Alpha Vantage"""
         try:
             # Check cache first
             cached = StockCache.get_cached(ticker, 'info')
             if cached:
                 return cached
 
-            # Try Yahoo Finance first
-            try:
-                stock = yf.Ticker(ticker.upper())
-                info = stock.info
-
-                if info and info.get('regularMarketPrice'):
-                    # Process and clean the data
-                    processed_info = {
-                        'ticker': ticker.upper(),
-                        'company_name': info.get('longName', info.get('shortName', ticker)),
-                        'sector': info.get('sector', 'Unknown'),
-                        'industry': info.get('industry', 'Unknown'),
-                        'market': 'DAX' if '.DE' in ticker.upper() else 'USA',
-                        'current_price': info.get('currentPrice') or info.get('regularMarketPrice'),
-                        'previous_close': info.get('previousClose'),
-                        'open': info.get('open'),
-                        'day_low': info.get('dayLow'),
-                        'day_high': info.get('dayHigh'),
-                        'volume': info.get('volume'),
-                        'avg_volume': info.get('averageVolume'),
-                        'market_cap': info.get('marketCap'),
-                        'beta': info.get('beta'),
-                        'pe_ratio': info.get('trailingPE'),
-                        'eps': info.get('trailingEps'),
-                        'dividend_yield': info.get('dividendYield'),
-                        'dividend_rate': info.get('dividendRate'),
-                        '52_week_low': info.get('fiftyTwoWeekLow'),
-                        '52_week_high': info.get('fiftyTwoWeekHigh'),
-                        'moving_avg_50': info.get('fiftyDayAverage'),
-                        'moving_avg_200': info.get('twoHundredDayAverage'),
-                        'shares_outstanding': info.get('sharesOutstanding'),
-                        'float_shares': info.get('floatShares'),
-                        'revenue': info.get('totalRevenue'),
-                        'profit_margin': info.get('profitMargins'),
-                        'operating_margin': info.get('operatingMargins'),
-                        'return_on_equity': info.get('returnOnEquity'),
-                        'debt_to_equity': info.get('debtToEquity'),
-                        'current_ratio': info.get('currentRatio'),
-                        'book_value': info.get('bookValue'),
-                        'price_to_book': info.get('priceToBook'),
-                        'earnings_date': info.get('earningsDate'),
-                        'forward_pe': info.get('forwardPE'),
-                        'peg_ratio': info.get('pegRatio'),
-                        'description': info.get('longBusinessSummary', ''),
-                        'website': info.get('website', ''),
-                        'exchange': info.get('exchange', ''),
-                        'currency': info.get('currency', 'USD'),
-                        'analyst_rating': info.get('recommendationKey'),
-                        'analyst_count': info.get('numberOfAnalystOpinions'),
-                        'target_high': info.get('targetHighPrice'),
-                        'target_low': info.get('targetLowPrice'),
-                        'target_mean': info.get('targetMeanPrice'),
-                        'source': 'yahoo_finance'
-                    }
-
-                    # Cache the result
-                    StockCache.set_cache(ticker, processed_info, 'info')
-                    return processed_info
-
-            except Exception as yf_error:
-                error_msg = str(yf_error)
-                if "429" in error_msg or "Too Many Requests" in error_msg:
-                    logger.warning(f"Yahoo Finance rate limit reached for {ticker}. Trying fallback sources...")
-                else:
-                    logger.warning(f"Yahoo Finance error for {ticker}: {error_msg}. Trying fallback sources...")
-
-            # If Yahoo Finance fails, try fallback sources
-            logger.info(f"Using fallback data sources for {ticker}")
-
-            # Get quote data
+            # Get quote data from fallback sources (Finnhub primary)
             quote_data = FallbackDataService.get_stock_quote(ticker)
             if not quote_data:
-                logger.error(f"All data sources failed for {ticker}")
+                logger.error(f"Failed to get quote data for {ticker}")
                 return None
 
             # Try to get additional company information
@@ -107,6 +37,7 @@ class StockService:
             processed_info.setdefault('market', 'DAX' if '.DE' in ticker.upper() else 'USA')
             processed_info.setdefault('sector', 'Unknown')
             processed_info.setdefault('industry', 'Unknown')
+            processed_info.setdefault('ticker', ticker.upper())
 
             # Cache the result
             StockCache.set_cache(ticker, processed_info, 'info')
@@ -119,31 +50,27 @@ class StockService:
 
     @staticmethod
     def get_price_history(ticker: str, period: str = "1y") -> Optional[Dict[str, Any]]:
-        """Get historical price data"""
+        """Get historical price data using Alpha Vantage"""
         try:
-            stock = yf.Ticker(ticker.upper())
-            history = stock.history(period=period)
-
-            if history.empty:
-                return None
-
-            # Convert to list of dicts for JSON serialization
-            history_data = []
-            for date, row in history.iterrows():
-                history_data.append({
-                    'date': date.isoformat(),
-                    'open': float(row['Open']),
-                    'high': float(row['High']),
-                    'low': float(row['Low']),
-                    'close': float(row['Close']),
-                    'volume': int(row['Volume'])
-                })
-
-            return {
-                'ticker': ticker.upper(),
-                'period': period,
-                'data': history_data
+            # Map period to outputsize (approximate)
+            period_map = {
+                '1mo': 30,
+                '3mo': 90,
+                '6mo': 180,
+                '1y': 365,
+                '2y': 730,
+                '5y': 1825
             }
+            outputsize = period_map.get(period, 365)
+
+            # Use fallback service for historical data
+            fallback_data = FallbackDataService.get_historical_data(ticker, outputsize=outputsize)
+            if fallback_data:
+                fallback_data['period'] = period
+                return fallback_data
+
+            logger.error(f"Failed to get history for {ticker}")
+            return None
 
         except Exception as e:
             logger.error(f"Error fetching price history for {ticker}: {str(e)}")
@@ -151,15 +78,22 @@ class StockService:
 
     @staticmethod
     def calculate_technical_indicators(ticker: str) -> Optional[Dict[str, Any]]:
-        """Calculate technical indicators for a stock"""
+        """Calculate technical indicators for a stock using historical data"""
         try:
-            stock = yf.Ticker(ticker.upper())
-            history = stock.history(period="6mo")
-
-            if history.empty:
+            # Get historical data
+            hist_data = StockService.get_price_history(ticker, period="6mo")
+            if not hist_data or not hist_data.get('data'):
+                logger.warning(f"No historical data available for technical indicators: {ticker}")
                 return None
 
-            close_prices = history['Close']
+            # Convert to pandas DataFrame
+            df = pd.DataFrame(hist_data['data'])
+            if df.empty or len(df) < 50:
+                logger.warning(f"Insufficient historical data for {ticker}: {len(df)} days")
+                return None
+
+            close_prices = pd.Series([float(x) for x in df['close']])
+            volumes = pd.Series([int(x) for x in df['volume']])
 
             # Calculate technical indicators
             indicators = {
@@ -167,12 +101,12 @@ class StockService:
                 'rsi': StockService._calculate_rsi(close_prices),
                 'macd': StockService._calculate_macd(close_prices),
                 'bollinger_bands': StockService._calculate_bollinger_bands(close_prices),
-                'sma_20': float(close_prices.rolling(window=20).mean().iloc[-1]),
-                'sma_50': float(close_prices.rolling(window=50).mean().iloc[-1]),
+                'sma_20': float(close_prices.rolling(window=20).mean().iloc[-1]) if len(close_prices) >= 20 else None,
+                'sma_50': float(close_prices.rolling(window=50).mean().iloc[-1]) if len(close_prices) >= 50 else None,
                 'ema_12': float(close_prices.ewm(span=12).mean().iloc[-1]),
                 'ema_26': float(close_prices.ewm(span=26).mean().iloc[-1]),
-                'volume_trend': StockService._calculate_volume_trend(history),
-                'price_change_1d': float((close_prices.iloc[-1] - close_prices.iloc[-2]) / close_prices.iloc[-2] * 100),
+                'volume_trend': StockService._calculate_volume_trend_series(volumes),
+                'price_change_1d': float((close_prices.iloc[-1] - close_prices.iloc[-2]) / close_prices.iloc[-2] * 100) if len(close_prices) > 1 else 0,
                 'price_change_1w': float((close_prices.iloc[-1] - close_prices.iloc[-5]) / close_prices.iloc[-5] * 100) if len(close_prices) > 5 else 0,
                 'price_change_1m': float((close_prices.iloc[-1] - close_prices.iloc[-20]) / close_prices.iloc[-20] * 100) if len(close_prices) > 20 else 0,
                 'volatility': float(close_prices.pct_change().std() * np.sqrt(252))  # Annualized volatility
@@ -229,6 +163,21 @@ class StockService:
         """Determine volume trend"""
         recent_volume = history['Volume'].tail(5).mean()
         avg_volume = history['Volume'].mean()
+
+        if recent_volume > avg_volume * 1.5:
+            return 'high'
+        elif recent_volume < avg_volume * 0.5:
+            return 'low'
+        return 'normal'
+
+    @staticmethod
+    def _calculate_volume_trend_series(volumes: pd.Series) -> str:
+        """Determine volume trend from pandas Series"""
+        if len(volumes) < 5:
+            return 'normal'
+
+        recent_volume = volumes.tail(5).mean()
+        avg_volume = volumes.mean()
 
         if recent_volume > avg_volume * 1.5:
             return 'high'
