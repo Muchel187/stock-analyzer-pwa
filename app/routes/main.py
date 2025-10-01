@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, send_from_directory, current_app
+from flask import Blueprint, render_template, send_from_directory, current_app, jsonify
 import os
 
 bp = Blueprint('main', __name__)
@@ -7,6 +7,28 @@ bp = Blueprint('main', __name__)
 def index():
     """Serve the main application"""
     return render_template('index.html')
+
+@bp.route('/health')
+@bp.route('/api/health')
+def health_check():
+    """Health check endpoint for monitoring"""
+    from app import db
+    
+    status = {
+        'status': 'healthy',
+        'database': 'disconnected',
+        'version': '3.0.0'
+    }
+    
+    # Check database connection
+    try:
+        db.session.execute('SELECT 1')
+        status['database'] = 'connected'
+        return jsonify(status), 200
+    except Exception as e:
+        status['status'] = 'unhealthy'
+        status['error'] = str(e)
+        return jsonify(status), 503
 
 @bp.route('/manifest.json')
 def manifest():

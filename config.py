@@ -54,6 +54,16 @@ class ProductionConfig(Config):
     DEBUG = False
     TESTING = False
     # Additional production settings
+    SESSION_COOKIE_SECURE = True  # Requires HTTPS
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    # CORS for production
+    CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '*').split(',')
+    # Ensure proper database connection
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_pre_ping': True,
+        'pool_recycle': 300,
+    }
 
 class TestingConfig(Config):
     TESTING = True

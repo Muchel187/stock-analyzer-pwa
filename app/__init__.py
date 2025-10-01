@@ -38,7 +38,17 @@ def create_app(config_name='default'):
     cache.init_app(app)
     jwt.init_app(app)
     mail.init_app(app)
-    CORS(app, supports_credentials=True)
+    
+    # Configure CORS with proper origins
+    if config_name == 'production':
+        allowed_origins = app.config.get('CORS_ORIGINS', ['*'])
+        CORS(app, 
+             supports_credentials=True,
+             origins=allowed_origins,
+             allow_headers=['Content-Type', 'Authorization'],
+             methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
+    else:
+        CORS(app, supports_credentials=True)
 
     # Configure login manager
     login_manager.login_view = 'auth.login'
