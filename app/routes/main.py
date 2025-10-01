@@ -13,6 +13,7 @@ def index():
 def health_check():
     """Health check endpoint for monitoring"""
     from app import db
+    from sqlalchemy import text
     
     status = {
         'status': 'healthy',
@@ -22,7 +23,7 @@ def health_check():
     
     # Check database connection
     try:
-        db.session.execute('SELECT 1')
+        db.session.execute(text('SELECT 1'))
         status['database'] = 'connected'
         return jsonify(status), 200
     except Exception as e:
