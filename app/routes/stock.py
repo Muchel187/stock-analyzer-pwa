@@ -241,29 +241,26 @@ def get_recommendations():
 @bp.route('/ai-recommendations', methods=['POST'])
 @jwt_required()
 def get_ai_recommendations():
-    """Get AI-powered top buy/sell recommendations from US and German markets"""
+    """Get AI-powered top buy/sell recommendations - FAST VERSION without AI analysis"""
     try:
+        # OPTIMIZATION: Skip AI analysis for speed, use technical + fundamental scores only
         # Top US stocks to analyze (S&P 500 leaders + trending)
         us_stocks = [
-            'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'BRK.B',
-            'JPM', 'V', 'JNJ', 'WMT', 'PG', 'MA', 'HD', 'DIS', 'NFLX', 'PYPL',
-            'ADBE', 'CRM', 'INTC', 'AMD', 'CSCO', 'PFE', 'KO', 'PEP', 'MRK',
-            'T', 'VZ', 'BA'
+            'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA',
+            'JPM', 'V', 'MA', 'HD', 'DIS', 'NFLX'
         ]
 
-        # Top German stocks (DAX)
+        # Top German stocks (DAX) - reduced list
         german_stocks = [
-            'SAP', 'SIE.DE', 'ALV.DE', 'AIR.DE', 'BAS.DE', 'BAYN.DE', 'BMW.DE',
-            'DAI.DE', 'DB1.DE', 'DBK.DE', 'DTE.DE', 'EOAN.DE', 'FRE.DE', 'HEI.DE',
-            'MUV2.DE', 'VOW3.DE'
+            'SAP', 'SIE.DE', 'ALV.DE', 'BMW.DE', 'DAI.DE'
         ]
 
         all_stocks = us_stocks + german_stocks
 
-        # Analyze stocks with AI
+        # Analyze stocks WITHOUT AI for speed (use technical + fundamental only)
         recommendations = []
 
-        for ticker in all_stocks[:20]:  # Limit to 20 for performance (can be adjusted)
+        for ticker in all_stocks[:15]:  # Reduced to 15 for faster loading
             try:
                 # Get stock info
                 stock_info = StockService.get_stock_info(ticker)
@@ -278,41 +275,58 @@ def get_ai_recommendations():
                 # Get technical indicators
                 technical = StockService.calculate_technical_indicators(ticker)
 
-                # Get AI analysis
-                ai_service = AIService()
-                ai_analysis = ai_service.analyze_stock_with_ai(
-                    stock_info,
-                    technical,
-                    fundamental
-                )
-
-                if ai_analysis and ai_analysis.get('ai_analysis'):
-                    # Extract recommendation and confidence
-                    analysis_data = ai_analysis['ai_analysis']
-                    recommendation_text = analysis_data.get('recommendation', '').upper()
-
-                    # Parse recommendation type (BUY, SELL, HOLD)
-                    rec_type = 'HOLD'
-                    if 'STRONG BUY' in recommendation_text or 'KAUFEN' in recommendation_text:
-                        rec_type = 'BUY'
-                    elif 'SELL' in recommendation_text or 'VERKAUFEN' in recommendation_text:
+                # FAST: Calculate recommendation based on technical + fundamental scores
+                # No AI call = much faster!
+                overall_score = fundamental.get('overall_score', 50)
+                
+                # Determine recommendation based on scores (adjusted thresholds)
+                rec_type = 'HOLD'
+                confidence = 70
+                
+                if overall_score >= 60:  # Lowered from 65
+                    rec_type = 'BUY'
+                    confidence = min(95, 65 + (overall_score - 60) * 2)
+                elif overall_score <= 40:  # Lowered from 35
+                    rec_type = 'SELL'
+                    confidence = min(95, 65 + (40 - overall_score) * 2)
+                else:
+                    confidence = 55
+                
+                # Check RSI for additional signal
+                if technical and technical.get('rsi'):
+                    rsi = technical['rsi']
+                    if rsi > 70 and rec_type != 'BUY':
                         rec_type = 'SELL'
-                    elif 'BUY' in recommendation_text:
+                        confidence = min(95, confidence + 15)
+                    elif rsi < 30 and rec_type != 'SELL':
+                        rec_type = 'BUY'
+                        confidence = min(95, confidence + 15)
+                    elif rsi > 60 and overall_score < 50:
+                        # Overbought but weak fundamentals
+                        rec_type = 'SELL'
+                    elif rsi < 40 and overall_score > 50:
+                        # Oversold but strong fundamentals
                         rec_type = 'BUY'
 
-                    # Get confidence score
-                    confidence = ai_analysis.get('confidence_score', 70)
+                # Create summary based on scores
+                summary = f"Score: {overall_score:.0f}/100. "
+                if rec_type == 'BUY':
+                    summary += "Strong fundamentals and technical indicators suggest buying opportunity."
+                elif rec_type == 'SELL':
+                    summary += "Weak fundamentals or overbought conditions suggest caution."
+                else:
+                    summary += "Mixed signals. Hold current positions."
 
-                    recommendations.append({
-                        'ticker': ticker,
-                        'company_name': stock_info.get('company_name', ticker),
-                        'current_price': stock_info.get('current_price'),
-                        'recommendation': rec_type,
-                        'confidence': confidence,
-                        'overall_score': fundamental.get('overall_score', 50),
-                        'market': 'US' if ticker in us_stocks else 'DE',
-                        'summary': analysis_data.get('summary', '')[:200]  # First 200 chars
-                    })
+                recommendations.append({
+                    'ticker': ticker,
+                    'company_name': stock_info.get('company_name', ticker),
+                    'current_price': stock_info.get('current_price'),
+                    'recommendation': rec_type,
+                    'confidence': int(confidence),
+                    'overall_score': overall_score,
+                    'market': 'US' if ticker in us_stocks else 'DE',
+                    'summary': summary
+                })
 
             except Exception as e:
                 print(f"Error analyzing {ticker}: {str(e)}")
