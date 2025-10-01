@@ -1450,3 +1450,85 @@ scales: {
 
 **Commit:** e18fe4c - "Fix: Comparison chart height overflow - limit to 400px with maxTicksLimit"
 
+
+
+### Watchlist Add Button Fix (October 2025)
+
+**Problem:** "Zur Watchlist hinzufügen" button in analysis Overview tab was non-functional.
+
+**Root Cause:**
+- Button was dynamically inserted via `innerHTML`
+- Inline `onclick` handler not properly bound to dynamically created elements
+- Event handler needs to be attached after DOM insertion
+
+**Solution Implemented:**
+
+**Button HTML Change** (`static/js/app.js`):
+```javascript
+// BEFORE (broken):
+<button class="btn btn-primary watchlist-add-btn" onclick="app.addToWatchlistFromAnalysis()">
+
+// AFTER (fixed):
+<button id="addToWatchlistBtn" class="btn btn-primary watchlist-add-btn">
+```
+
+**Event Listener Registration** (`displayStockAnalysis` method):
+```javascript
+// Add event listener after DOM insertion
+setTimeout(() => {
+    const watchlistBtn = document.getElementById('addToWatchlistBtn');
+    if (watchlistBtn) {
+        watchlistBtn.addEventListener('click', () => this.addToWatchlistFromAnalysis());
+    }
+}, 100);
+```
+
+**Enhanced Error Handling** (`addToWatchlistFromAnalysis` method):
+```javascript
+async addToWatchlistFromAnalysis() {
+    console.log('addToWatchlistFromAnalysis called');
+    console.log('currentUser:', this.currentUser);
+    console.log('currentAnalysisTicker:', this.currentAnalysisTicker);
+    
+    // Validation checks...
+    
+    try {
+        await api.addToWatchlist(this.currentAnalysisTicker);
+        this.showNotification(`${this.currentAnalysisTicker} zur Watchlist hinzugefügt`, 'success');
+        // Refresh watchlist after adding
+        await this.loadWatchlistItems();
+    } catch (error) {
+        console.error('Error adding to watchlist:', error);
+        // Error handling...
+    }
+}
+```
+
+**Results:**
+- Button now properly clickable in analysis page
+- Stock correctly added to watchlist
+- Watchlist auto-refreshes after addition
+- Console logging for debugging
+- Proper error messages displayed
+
+**Files Modified:**
+- `static/js/app.js` - Button ID added, event listener registration, enhanced error handling (+15 lines)
+
+**Testing:**
+- ✅ Button appears in Overview tab
+- ✅ Button clickable and responsive
+- ✅ Stock added to watchlist successfully
+- ✅ Duplicate detection working ("already in watchlist" message)
+- ✅ Watchlist refreshes automatically
+- ✅ Console logs help debugging
+
+**Key Lesson:**
+- **Always use event listeners for dynamically inserted elements**
+- Inline `onclick` handlers unreliable with `innerHTML`
+- Use `setTimeout` to ensure DOM ready before attaching listeners
+- Add console logging for complex user interactions
+
+**Commits:**
+- 394db31 - "Fix: Watchlist add button - use event listener instead of inline onclick"
+- 338a393 - "Clean: Remove test file"
+
