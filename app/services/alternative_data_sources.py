@@ -364,44 +364,71 @@ class FallbackDataService:
 
     @staticmethod
     def get_company_info(ticker: str) -> Optional[Dict[str, Any]]:
-        """Try to get company information from available sources"""
-        # Try Alpha Vantage (has best company overview)
-        if os.getenv('ALPHA_VANTAGE_API_KEY'):
-            data = AlphaVantageService.get_company_overview(ticker)
-            if data:
-                return data
+        """Try to get company information from available sources with proper fallback"""
 
-        # Try Finnhub profile
+        # Try Finnhub first (60 requests/minute - more reliable)
         if os.getenv('FINNHUB_API_KEY'):
-            data = FinnhubService.get_company_profile(ticker)
-            if data:
-                return data
+            try:
+                logger.info(f"Trying Finnhub for company info: {ticker}")
+                data = FinnhubService.get_company_profile(ticker)
+                if data:
+                    logger.info(f"Successfully fetched company info for {ticker} from Finnhub")
+                    return data
+            except Exception as e:
+                logger.warning(f"Finnhub failed for company info {ticker}: {str(e)}")
+
+        # Try Alpha Vantage as fallback (has best company overview but limited to 25 requests/day)
+        if os.getenv('ALPHA_VANTAGE_API_KEY'):
+            try:
+                logger.info(f"Trying Alpha Vantage for company info: {ticker}")
+                data = AlphaVantageService.get_company_overview(ticker)
+                if data:
+                    logger.info(f"Successfully fetched company info for {ticker} from Alpha Vantage")
+                    return data
+            except Exception as e:
+                logger.warning(f"Alpha Vantage failed for company info {ticker}: {str(e)}")
 
         return None
 
     @staticmethod
     def get_historical_data(ticker: str, outputsize: int = 30) -> Optional[Dict[str, Any]]:
-        """Try to get historical price data from available sources"""
-        # Try Alpha Vantage first (more reliable)
-        if os.getenv('ALPHA_VANTAGE_API_KEY'):
-            logger.info(f"Trying Alpha Vantage for historical data: {ticker}")
-            # Alpha Vantage uses 'compact' (100 days) or 'full' (20+ years)
-            av_outputsize = "full" if outputsize > 100 else "compact"
-            data = AlphaVantageService.get_time_series_daily(ticker, outputsize=av_outputsize)
-            if data:
-                logger.info(f"Successfully fetched historical data for {ticker} from Alpha Vantage")
-                # Limit to requested outputsize
-                if len(data['data']) > outputsize:
-                    data['data'] = data['data'][-outputsize:]
-                return data
+        """Try to get historical price data from available sources with proper fallback"""
 
-        # Try Twelve Data as fallback
+        # Try Twelve Data first (800 requests/day - more reliable)
         if os.getenv('TWELVE_DATA_API_KEY'):
             logger.info(f"Trying Twelve Data for historical data: {ticker}")
-            data = TwelveDataService.get_time_series(ticker, outputsize=outputsize)
-            if data:
-                logger.info(f"Successfully fetched historical data for {ticker} from Twelve Data")
-                return data
+            try:
+                data = TwelveDataService.get_time_series(ticker, outputsize=outputsize)
+                if data:
+                    logger.info(f"Successfully fetched historical data for {ticker} from Twelve Data")
+                    return data
+            except Exception as e:
+                logger.warning(f"Twelve Data failed for historical {ticker}: {str(e)}")
+
+        # Try Alpha Vantage as fallback (25 requests/day)
+        if os.getenv('ALPHA_VANTAGE_API_KEY'):
+            logger.info(f"Trying Alpha Vantage for historical data: {ticker}")
+            try:
+                # Alpha Vantage uses 'compact' (100 days) or 'full' (20+ years)
+                av_outputsize = "full" if outputsize > 100 else "compact"
+                data = AlphaVantageService.get_time_series_daily(ticker, outputsize=av_outputsize)
+                if data:
+                    logger.info(f"Successfully fetched historical data for {ticker} from Alpha Vantage")
+                    # Limit to requested outputsize
+                    if len(data['data']) > outputsize:
+                        data['data'] = data['data'][-outputsize:]
+                    return data
+            except Exception as e:
+                logger.warning(f"Alpha Vantage failed for historical {ticker}: {str(e)}")
+
+        # Try Finnhub as last resort (limited historical data)
+        if os.getenv('FINNHUB_API_KEY'):
+            logger.info(f"Trying Finnhub for historical data: {ticker}")
+            try:
+                # Finnhub doesn't have a direct time series endpoint, so we skip it
+                logger.info(f"Finnhub doesn't support historical time series, skipping")
+            except Exception as e:
+                logger.warning(f"Finnhub failed for historical {ticker}: {str(e)}")
 
         logger.warning(f"No fallback source available for historical data: {ticker}")
         return None
