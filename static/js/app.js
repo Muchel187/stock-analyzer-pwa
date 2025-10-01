@@ -554,6 +554,14 @@ class StockAnalyzerApp {
 
         // Display overview tab
         document.getElementById('overview-tab').innerHTML = this.createOverviewContent(data.info);
+        
+        // Add event listener for watchlist button
+        setTimeout(() => {
+            const watchlistBtn = document.getElementById('addToWatchlistBtn');
+            if (watchlistBtn) {
+                watchlistBtn.addEventListener('click', () => this.addToWatchlistFromAnalysis());
+            }
+        }, 100);
 
         // Display technical tab
         if (data.technical_indicators) {
@@ -592,7 +600,7 @@ class StockAnalyzerApp {
     createOverviewContent(info) {
         return `
             <div class="overview-header-actions">
-                <button class="btn btn-primary watchlist-add-btn" onclick="app.addToWatchlistFromAnalysis()">
+                <button id="addToWatchlistBtn" class="btn btn-primary watchlist-add-btn">
                     <span class="btn-icon">⭐</span>
                     Zur Watchlist hinzufügen
                 </button>
@@ -1586,6 +1594,10 @@ class StockAnalyzerApp {
     }
 
     async addToWatchlistFromAnalysis() {
+        console.log('addToWatchlistFromAnalysis called');
+        console.log('currentUser:', this.currentUser);
+        console.log('currentAnalysisTicker:', this.currentAnalysisTicker);
+        
         if (!this.currentUser) {
             this.showNotification('Bitte melden Sie sich an', 'error');
             return;
@@ -1599,7 +1611,10 @@ class StockAnalyzerApp {
         try {
             await api.addToWatchlist(this.currentAnalysisTicker);
             this.showNotification(`${this.currentAnalysisTicker} zur Watchlist hinzugefügt`, 'success');
+            // Refresh watchlist
+            await this.loadWatchlistItems();
         } catch (error) {
+            console.error('Error adding to watchlist:', error);
             if (error.message && error.message.includes('already exists')) {
                 this.showNotification(`${this.currentAnalysisTicker} ist bereits in der Watchlist`, 'info');
             } else {

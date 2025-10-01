@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Watchlist Button Test</title>
+    <style>
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test: Watchlist Button</h1>
+    <button class="btn btn-primary" onclick="testFunction()">
+        <span>⭐</span>
+        Zur Watchlist hinzufügen
+    </button>
+    
+    <div id="result"></div>
+    
+    <script>
+        function testFunction() {
+            document.getElementById('result').innerHTML = '<p style="color: green;">Button funktioniert!</p>';
+            console.log('Button clicked');
+        }
+    </script>
+</body>
+</html>
