@@ -89,6 +89,13 @@ class StockAnalyzerApp {
             e.preventDefault();
             await this.runScreener();
         });
+
+        // Alert form
+        const alertForm = document.getElementById('alertForm');
+        alertForm?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await this.handleCreateAlert(e);
+        });
     }
 
     async checkAuthentication() {
@@ -1402,6 +1409,81 @@ class StockAnalyzerApp {
                 </div>
             </div>
         `).join('');
+    }
+
+    // Alert creation and management
+    showCreateAlert() {
+        this.openModal('alertModal');
+        // Clear form
+        document.getElementById('alertForm').reset();
+    }
+
+    createAlertForStock(ticker) {
+        if (!ticker) {
+            this.showNotification('Kein Ticker angegeben', 'error');
+            return;
+        }
+        
+        this.openModal('alertModal');
+        // Pre-fill ticker
+        document.getElementById('alertTicker').value = ticker.toUpperCase();
+        // Clear other fields
+        document.getElementById('alertCondition').value = 'above';
+        document.getElementById('alertTargetPrice').value = '';
+        document.getElementById('alertNote').value = '';
+    }
+
+    async handleCreateAlert(event) {
+        event.preventDefault();
+
+        if (!this.currentUser) {
+            this.showNotification('Bitte melden Sie sich an', 'error');
+            return;
+        }
+
+        const ticker = document.getElementById('alertTicker').value.toUpperCase();
+        const condition = document.getElementById('alertCondition').value;
+        const targetPrice = parseFloat(document.getElementById('alertTargetPrice').value);
+        const note = document.getElementById('alertNote').value;
+
+        if (!ticker || !targetPrice || targetPrice <= 0) {
+            this.showNotification('Bitte füllen Sie alle erforderlichen Felder aus', 'error');
+            return;
+        }
+
+        try {
+            const alertData = {
+                ticker: ticker,
+                alert_type: condition === 'above' ? 'price_above' : 'price_below',
+                target_value: targetPrice,
+                note: note || null
+            };
+
+            await api.createAlert(alertData);
+            this.showNotification(`Alert für ${ticker} erstellt`, 'success');
+            this.closeModal('alertModal');
+            
+            // Reload alerts if on alerts page
+            if (this.currentPage === 'alerts') {
+                await this.loadAlerts();
+            }
+        } catch (error) {
+            this.showNotification(error.message || 'Alert konnte nicht erstellt werden', 'error');
+        }
+    }
+
+    async deleteAlert(alertId) {
+        if (!confirm('Möchten Sie diesen Alert wirklich löschen?')) {
+            return;
+        }
+
+        try {
+            await api.deleteAlert(alertId);
+            this.showNotification('Alert gelöscht', 'success');
+            await this.loadAlerts();
+        } catch (error) {
+            this.showNotification('Alert konnte nicht gelöscht werden', 'error');
+        }
     }
 
     // User actions
