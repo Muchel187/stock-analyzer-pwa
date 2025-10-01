@@ -251,6 +251,13 @@ class APIService {
     async getAlertStatistics() {
         return await this.request('/alerts/statistics');
     }
+
+    // AI Recommendations endpoint
+    async getAIRecommendations() {
+        return await this.request('/stock/ai-recommendations', {
+            method: 'POST'
+        });
+    }
 }
 
 // Create global API instance

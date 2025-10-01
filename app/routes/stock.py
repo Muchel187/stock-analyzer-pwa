@@ -52,6 +52,37 @@ def get_price_history(ticker):
     except Exception as e:
         return jsonify({'error': f'Failed to get price history: {str(e)}'}), 500
 
+@bp.route('/<ticker>/analyze-with-ai', methods=['GET'])
+def analyze_with_ai_get(ticker):
+    """Analyze stock with AI assistance (GET method)"""
+    try:
+        # Get stock data
+        stock_info = StockService.get_stock_info(ticker)
+        if not stock_info:
+            return jsonify({'error': f'Stock {ticker} not found'}), 404
+
+        # Get additional analysis data
+        technical = StockService.calculate_technical_indicators(ticker)
+        fundamental = StockService.get_fundamental_analysis(ticker)
+
+        # Generate AI analysis
+        ai_service = AIService()
+        ai_analysis = ai_service.analyze_stock_with_ai(
+            stock_info,
+            technical,
+            fundamental
+        )
+
+        if not ai_analysis:
+            return jsonify({'error': 'AI analysis failed'}), 500
+
+        ai_analysis['timestamp'] = datetime.utcnow().isoformat()
+
+        return jsonify(ai_analysis), 200
+
+    except Exception as e:
+        return jsonify({'error': f'AI analysis failed: {str(e)}'}), 500
+
 @bp.route('/analyze-with-ai', methods=['POST'])
 def analyze_with_ai():
     """Analyze stock with AI assistance"""
@@ -205,3 +236,100 @@ def get_recommendations():
 
     except Exception as e:
         return jsonify({'error': f'Failed to get recommendations: {str(e)}'}), 500
+
+@bp.route('/ai-recommendations', methods=['POST'])
+@jwt_required()
+def get_ai_recommendations():
+    """Get AI-powered top buy/sell recommendations from US and German markets"""
+    try:
+        # Top US stocks to analyze (S&P 500 leaders + trending)
+        us_stocks = [
+            'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'BRK.B',
+            'JPM', 'V', 'JNJ', 'WMT', 'PG', 'MA', 'HD', 'DIS', 'NFLX', 'PYPL',
+            'ADBE', 'CRM', 'INTC', 'AMD', 'CSCO', 'PFE', 'KO', 'PEP', 'MRK',
+            'T', 'VZ', 'BA'
+        ]
+
+        # Top German stocks (DAX)
+        german_stocks = [
+            'SAP', 'SIE.DE', 'ALV.DE', 'AIR.DE', 'BAS.DE', 'BAYN.DE', 'BMW.DE',
+            'DAI.DE', 'DB1.DE', 'DBK.DE', 'DTE.DE', 'EOAN.DE', 'FRE.DE', 'HEI.DE',
+            'MUV2.DE', 'VOW3.DE'
+        ]
+
+        all_stocks = us_stocks + german_stocks
+
+        # Analyze stocks with AI
+        recommendations = []
+
+        for ticker in all_stocks[:20]:  # Limit to 20 for performance (can be adjusted)
+            try:
+                # Get stock info
+                stock_info = StockService.get_stock_info(ticker)
+                if not stock_info:
+                    continue
+
+                # Get fundamental analysis
+                fundamental = StockService.get_fundamental_analysis(ticker)
+                if not fundamental:
+                    continue
+
+                # Get technical indicators
+                technical = StockService.calculate_technical_indicators(ticker)
+
+                # Get AI analysis
+                ai_analysis = AIService.analyze_stock(
+                    ticker=ticker,
+                    stock_info=stock_info,
+                    fundamental_analysis=fundamental,
+                    technical_indicators=technical
+                )
+
+                if ai_analysis and ai_analysis.get('ai_analysis'):
+                    # Extract recommendation and confidence
+                    analysis_data = ai_analysis['ai_analysis']
+                    recommendation_text = analysis_data.get('recommendation', '').upper()
+
+                    # Parse recommendation type (BUY, SELL, HOLD)
+                    rec_type = 'HOLD'
+                    if 'STRONG BUY' in recommendation_text or 'KAUFEN' in recommendation_text:
+                        rec_type = 'BUY'
+                    elif 'SELL' in recommendation_text or 'VERKAUFEN' in recommendation_text:
+                        rec_type = 'SELL'
+                    elif 'BUY' in recommendation_text:
+                        rec_type = 'BUY'
+
+                    # Get confidence score
+                    confidence = ai_analysis.get('confidence_score', 70)
+
+                    recommendations.append({
+                        'ticker': ticker,
+                        'company_name': stock_info.get('company_name', ticker),
+                        'current_price': stock_info.get('current_price'),
+                        'recommendation': rec_type,
+                        'confidence': confidence,
+                        'overall_score': fundamental.get('overall_score', 50),
+                        'market': 'US' if ticker in us_stocks else 'DE',
+                        'summary': analysis_data.get('summary', '')[:200]  # First 200 chars
+                    })
+
+            except Exception as e:
+                print(f"Error analyzing {ticker}: {str(e)}")
+                continue
+
+        # Sort by confidence score
+        recommendations.sort(key=lambda x: x['confidence'], reverse=True)
+
+        # Get top 10 buys and top 10 sells
+        buy_recs = [r for r in recommendations if r['recommendation'] == 'BUY'][:10]
+        sell_recs = [r for r in recommendations if r['recommendation'] == 'SELL'][:10]
+
+        return jsonify({
+            'top_buys': buy_recs,
+            'top_sells': sell_recs,
+            'analyzed_count': len(recommendations),
+            'timestamp': datetime.utcnow().isoformat()
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': f'Failed to generate AI recommendations: {str(e)}'}), 500

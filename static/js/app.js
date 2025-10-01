@@ -3,6 +3,8 @@ class StockAnalyzerApp {
     constructor() {
         this.currentPage = 'dashboard';
         this.currentUser = null;
+        this.aiVisualizer = new AIAnalysisVisualizer();
+        this.currentAnalysisTicker = null;
         this.init();
     }
 
@@ -277,6 +279,145 @@ class StockAnalyzerApp {
         }).join('');
     }
 
+    async refreshAIRecommendations() {
+        if (!this.currentUser) {
+            this.showNotification('Bitte melden Sie sich an', 'error');
+            return;
+        }
+
+        const container = document.getElementById('aiRecommendationsContent');
+        const refreshBtn = document.getElementById('aiRefreshBtn');
+        const refreshIcon = document.getElementById('aiRefreshIcon');
+        const refreshText = document.getElementById('aiRefreshText');
+
+        // Show loading state
+        refreshBtn.disabled = true;
+        refreshIcon.classList.add('spinning');
+        refreshText.textContent = 'Analysiere...';
+
+        container.innerHTML = `
+            <div class="ai-recs-loading">
+                <div class="loading-spinner"></div>
+                <p>KI analysiert den Markt...</p>
+                <p class="loading-note">Dies kann einige Minuten dauern</p>
+            </div>
+        `;
+
+        try {
+            const response = await api.getAIRecommendations();
+            this.displayAIRecommendations(response);
+            this.showNotification('KI-Analyse abgeschlossen', 'success');
+        } catch (error) {
+            container.innerHTML = `
+                <div class="ai-recs-error">
+                    <div class="error-icon">⚠️</div>
+                    <p>Fehler bei der KI-Analyse</p>
+                    <p class="error-note">${error.message || 'Bitte versuchen Sie es später erneut'}</p>
+                </div>
+            `;
+            this.showNotification('KI-Analyse fehlgeschlagen', 'error');
+        } finally {
+            refreshBtn.disabled = false;
+            refreshIcon.classList.remove('spinning');
+            refreshText.textContent = 'Aktualisieren';
+        }
+    }
+
+    displayAIRecommendations(data) {
+        const container = document.getElementById('aiRecommendationsContent');
+        const { top_buys, top_sells, analyzed_count, timestamp } = data;
+
+        if (!top_buys || top_buys.length === 0) {
+            container.innerHTML = `
+                <div class="ai-recs-empty">
+                    <div class="error-icon">⚠️</div>
+                    <p><strong>Keine Kaufempfehlungen verfügbar</strong></p>
+                    <p class="error-note">Mögliche Gründe:</p>
+                    <ul class="error-reasons">
+                        <li><strong>API-Limit erreicht:</strong> Alpha Vantage erlaubt nur 25 Anfragen pro Tag im kostenlosen Plan</li>
+                        <li><strong>Finnhub/Twelve Data Schlüssel fehlen:</strong> Fügen Sie FINNHUB_API_KEY und TWELVE_DATA_API_KEY zur .env Datei hinzu</li>
+                        <li><strong>Keine BUY-Empfehlungen:</strong> KI hat keine Kaufempfehlungen gefunden</li>
+                    </ul>
+                    <p class="error-note"><strong>Analysierte Aktien:</strong> ${analyzed_count || 0}</p>
+                    <p class="error-note">💡 <strong>Tipp:</strong> Warten Sie bis morgen oder fügen Sie weitere API-Schlüssel hinzu</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = `
+            <div class="ai-recs-header">
+                <div class="ai-recs-info">
+                    <span class="ai-recs-count">📊 ${analyzed_count} Aktien analysiert</span>
+                    <span class="ai-recs-time">⏱️ ${new Date(timestamp).toLocaleString('de-DE')}</span>
+                </div>
+            </div>
+
+            <div class="ai-recs-grid">
+                <!-- Top Buys -->
+                <div class="ai-recs-section">
+                    <div class="ai-recs-section-header buy">
+                        <h4>🚀 Top 10 Kaufempfehlungen</h4>
+                    </div>
+                    <div class="ai-recs-list">
+                        ${top_buys.map((stock, index) => this.createAIRecommendationCard(stock, index + 1, 'buy')).join('')}
+                    </div>
+                </div>
+
+                <!-- Top Sells -->
+                ${top_sells && top_sells.length > 0 ? `
+                <div class="ai-recs-section">
+                    <div class="ai-recs-section-header sell">
+                        <h4>⚠️ Top 10 Verkaufsempfehlungen</h4>
+                    </div>
+                    <div class="ai-recs-list">
+                        ${top_sells.map((stock, index) => this.createAIRecommendationCard(stock, index + 1, 'sell')).join('')}
+                    </div>
+                </div>
+                ` : ''}
+            </div>
+        `;
+    }
+
+    createAIRecommendationCard(stock, rank, type) {
+        const badgeClass = type === 'buy' ? 'badge-success' : 'badge-danger';
+        const marketBadge = stock.market === 'US' ? '🇺🇸 US' : '🇩🇪 DE';
+
+        return `
+            <div class="ai-rec-card ${type}" onclick="app.showStockDetails('${stock.ticker}')">
+                <div class="ai-rec-rank">#${rank}</div>
+                <div class="ai-rec-main">
+                    <div class="ai-rec-header">
+                        <div class="ai-rec-ticker-group">
+                            <span class="ai-rec-ticker">${stock.ticker}</span>
+                            <span class="ai-rec-market-badge">${marketBadge}</span>
+                        </div>
+                        <span class="ai-rec-price">$${stock.current_price?.toFixed(2) || '-'}</span>
+                    </div>
+                    <div class="ai-rec-company">${stock.company_name}</div>
+                    ${stock.summary ? `<div class="ai-rec-summary">${stock.summary}</div>` : ''}
+                    <div class="ai-rec-metrics">
+                        <span class="ai-rec-badge ${badgeClass}">${type === 'buy' ? 'KAUFEN' : 'VERKAUFEN'}</span>
+                        <span class="ai-rec-confidence">
+                            <span class="confidence-bar" style="--confidence: ${stock.confidence}%">
+                                <span class="confidence-fill"></span>
+                            </span>
+                            <span class="confidence-text">${stock.confidence}% Vertrauen</span>
+                        </span>
+                        <span class="ai-rec-score">Score: ${stock.overall_score?.toFixed(0) || '-'}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    showStockDetails(ticker) {
+        // Navigate to analysis page and search for the stock
+        this.showPage('analysis');
+        document.getElementById('stockSearch').value = ticker;
+        this.analyzeStock();
+    }
+
     async refreshAlerts() {
         const container = document.getElementById('activeAlerts');
         container.classList.add('loading');
@@ -342,6 +483,10 @@ class StockAnalyzerApp {
     }
 
     displayStockAnalysis(data, aiAnalysis) {
+        // Store current ticker and price for AI analysis
+        this.currentAnalysisTicker = data.ticker;
+        this.currentStockPrice = data.info.current_price;
+
         // Display header
         document.getElementById('stockName').textContent = `${data.info.ticker} - ${data.info.company_name}`;
 
@@ -376,48 +521,452 @@ class StockAnalyzerApp {
 
     createOverviewContent(info) {
         return `
+            <div class="overview-header-actions">
+                <button class="btn btn-primary watchlist-add-btn" onclick="app.addToWatchlistFromAnalysis()">
+                    <span class="btn-icon">⭐</span>
+                    Zur Watchlist hinzufügen
+                </button>
+            </div>
             <div class="metrics-grid">
                 <div class="metric-item">
                     <span class="metric-label">Market Cap</span>
-                    <span class="metric-value">$${(info.market_cap / 1e9).toFixed(2)}B</span>
+                    <span class="metric-value">${info.market_cap ? '$' + (info.market_cap).toFixed(2) + 'B' : 'N/A'}</span>
                 </div>
                 <div class="metric-item">
-                    <span class="metric-label">P/E Ratio</span>
-                    <span class="metric-value">${info.pe_ratio?.toFixed(2) || 'N/A'}</span>
+                    <span class="metric-label">Aktueller Kurs</span>
+                    <span class="metric-value">$${info.current_price?.toFixed(2) || 'N/A'}</span>
                 </div>
                 <div class="metric-item">
-                    <span class="metric-label">Dividend Yield</span>
-                    <span class="metric-value">${info.dividend_yield ? (info.dividend_yield * 100).toFixed(2) + '%' : 'N/A'}</span>
+                    <span class="metric-label">Tages-Hoch</span>
+                    <span class="metric-value">$${info.day_high?.toFixed(2) || 'N/A'}</span>
                 </div>
                 <div class="metric-item">
-                    <span class="metric-label">52 Week Range</span>
-                    <span class="metric-value">$${info['52_week_low']?.toFixed(2)} - $${info['52_week_high']?.toFixed(2)}</span>
+                    <span class="metric-label">Tages-Tief</span>
+                    <span class="metric-value">$${info.day_low?.toFixed(2) || 'N/A'}</span>
+                </div>
+                <div class="metric-item">
+                    <span class="metric-label">Eröffnung</span>
+                    <span class="metric-value">$${info.open?.toFixed(2) || 'N/A'}</span>
+                </div>
+                <div class="metric-item">
+                    <span class="metric-label">Vortagesschluss</span>
+                    <span class="metric-value">$${info.previous_close?.toFixed(2) || 'N/A'}</span>
+                </div>
+                <div class="metric-item">
+                    <span class="metric-label">Börse</span>
+                    <span class="metric-value">${info.exchange || 'N/A'}</span>
+                </div>
+                <div class="metric-item">
+                    <span class="metric-label">Sektor</span>
+                    <span class="metric-value">${info.sector || 'N/A'}</span>
                 </div>
             </div>
             <div class="description">
                 <h4>Über das Unternehmen</h4>
-                <p>${info.description || 'Keine Beschreibung verfügbar'}</p>
+                <div class="company-info">
+                    <div class="info-row">
+                        <span class="info-label">Name:</span>
+                        <span class="info-value">${info.company_name || 'N/A'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Industrie:</span>
+                        <span class="info-value">${info.industry || 'N/A'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Land:</span>
+                        <span class="info-value">${info.country || 'N/A'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Währung:</span>
+                        <span class="info-value">${info.currency || 'USD'}</span>
+                    </div>
+                    ${info.website ? `
+                    <div class="info-row">
+                        <span class="info-label">Website:</span>
+                        <span class="info-value"><a href="${info.website}" target="_blank" rel="noopener">${info.website}</a></span>
+                    </div>
+                    ` : ''}
+                    ${info.logo ? `
+                    <div class="company-logo">
+                        <img src="${info.logo}" alt="${info.company_name} Logo" onerror="this.style.display='none'">
+                    </div>
+                    ` : ''}
+                </div>
             </div>
         `;
     }
 
     createTechnicalContent(technical) {
+        // Store technical data for chart rendering
+        this.currentTechnicalData = technical;
+
         return `
-            <div class="technical-indicators">
-                <div class="indicator">
-                    <span class="indicator-label">RSI (14)</span>
-                    <span class="indicator-value">${technical.rsi?.toFixed(2) || 'N/A'}</span>
+            <div class="technical-analysis-container">
+                <!-- Visual Indicators -->
+                <div class="technical-charts-grid">
+                    <div class="tech-chart-card">
+                        <h4>📊 RSI (Relative Strength Index)</h4>
+                        <canvas id="rsiGaugeChart"></canvas>
+                        <div class="indicator-status">
+                            <span class="status-label">Status:</span>
+                            <span class="status-value ${this.getRSIStatus(technical.rsi).class}">
+                                ${this.getRSIStatus(technical.rsi).text}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="tech-chart-card">
+                        <h4>📈 MACD</h4>
+                        <canvas id="macdChart"></canvas>
+                        <div class="indicator-status">
+                            <span class="status-label">Signal:</span>
+                            <span class="status-value ${technical.macd?.macd > 0 ? 'bullish' : 'bearish'}">
+                                ${technical.macd?.macd > 0 ? 'Bullisch' : 'Bärisch'}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="tech-chart-card">
+                        <h4>📉 Bollinger Bands Position</h4>
+                        <canvas id="bollingerChart"></canvas>
+                        <div class="indicator-status">
+                            <span class="status-label">Position:</span>
+                            <span class="status-value">${(technical.bollinger_bands?.current_position * 100)?.toFixed(1) || 'N/A'}%</span>
+                        </div>
+                    </div>
+
+                    <div class="tech-chart-card">
+                        <h4>⚡ Volatilität</h4>
+                        <canvas id="volatilityChart"></canvas>
+                        <div class="indicator-status">
+                            <span class="status-label">Level:</span>
+                            <span class="status-value ${technical.volatility > 0.5 ? 'high' : 'normal'}">
+                                ${technical.volatility > 0.5 ? 'Hoch' : 'Normal'} (${(technical.volatility * 100)?.toFixed(1)}%)
+                            </span>
+                        </div>
+                    </div>
                 </div>
-                <div class="indicator">
-                    <span class="indicator-label">MACD</span>
-                    <span class="indicator-value">${technical.macd?.macd?.toFixed(2) || 'N/A'}</span>
+
+                <!-- Moving Averages Comparison -->
+                <div class="tech-chart-card full-width">
+                    <h4>📊 Moving Averages Vergleich</h4>
+                    <canvas id="movingAveragesChart"></canvas>
                 </div>
-                <div class="indicator">
-                    <span class="indicator-label">Volatilität</span>
-                    <span class="indicator-value">${(technical.volatility * 100)?.toFixed(2)}%</span>
+
+                <!-- Price Changes -->
+                <div class="price-changes-grid">
+                    <div class="price-change-card">
+                        <div class="pc-label">1 Tag</div>
+                        <div class="pc-value ${technical.price_change_1d > 0 ? 'positive' : 'negative'}">
+                            ${technical.price_change_1d > 0 ? '+' : ''}${technical.price_change_1d?.toFixed(2) || 'N/A'}%
+                        </div>
+                    </div>
+                    <div class="price-change-card">
+                        <div class="pc-label">1 Woche</div>
+                        <div class="pc-value ${technical.price_change_1w > 0 ? 'positive' : 'negative'}">
+                            ${technical.price_change_1w > 0 ? '+' : ''}${technical.price_change_1w?.toFixed(2) || 'N/A'}%
+                        </div>
+                    </div>
+                    <div class="price-change-card">
+                        <div class="pc-label">1 Monat</div>
+                        <div class="pc-value ${technical.price_change_1m > 0 ? 'positive' : 'negative'}">
+                            ${technical.price_change_1m > 0 ? '+' : ''}${technical.price_change_1m?.toFixed(2) || 'N/A'}%
+                        </div>
+                    </div>
+                    <div class="price-change-card">
+                        <div class="pc-label">Volumen Trend</div>
+                        <div class="pc-value">${technical.volume_trend || 'Normal'}</div>
+                    </div>
                 </div>
             </div>
         `;
+    }
+
+    getRSIStatus(rsi) {
+        if (!rsi) return { text: 'N/A', class: '' };
+        if (rsi > 70) return { text: 'Überkauft', class: 'overbought' };
+        if (rsi < 30) return { text: 'Überverkauft', class: 'oversold' };
+        return { text: 'Neutral', class: 'neutral' };
+    }
+
+    initTechnicalCharts(technical) {
+        if (!technical) return;
+
+        // RSI Gauge Chart
+        this.createRSIGaugeChart(technical.rsi);
+
+        // MACD Bar Chart
+        this.createMACDChart(technical.macd);
+
+        // Bollinger Bands Position Chart
+        this.createBollingerChart(technical.bollinger_bands);
+
+        // Volatility Gauge
+        this.createVolatilityChart(technical.volatility);
+
+        // Moving Averages Comparison
+        this.createMovingAveragesChart(technical);
+    }
+
+    createRSIGaugeChart(rsi) {
+        const canvas = document.getElementById('rsiGaugeChart');
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d');
+
+        if (this.rsiChart) {
+            this.rsiChart.destroy();
+        }
+
+        const rsiValue = rsi || 50;
+
+        this.rsiChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                datasets: [{
+                    data: [rsiValue, 100 - rsiValue],
+                    backgroundColor: [
+                        rsiValue > 70 ? '#ef4444' : rsiValue < 30 ? '#10b981' : '#3b82f6',
+                        '#1f2937'
+                    ],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                cutout: '75%',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { enabled: false }
+                }
+            },
+            plugins: [{
+                id: 'centerText',
+                afterDraw: (chart) => {
+                    const width = chart.width;
+                    const height = chart.height;
+                    const ctx = chart.ctx;
+                    ctx.restore();
+                    const fontSize = (height / 114).toFixed(2);
+                    ctx.font = fontSize + "em sans-serif";
+                    ctx.textBaseline = "middle";
+                    ctx.fillStyle = '#fff';
+                    const text = rsiValue.toFixed(1);
+                    const textX = Math.round((width - ctx.measureText(text).width) / 2);
+                    const textY = height / 2;
+                    ctx.fillText(text, textX, textY);
+                    ctx.save();
+                }
+            }]
+        });
+    }
+
+    createMACDChart(macd) {
+        const canvas = document.getElementById('macdChart');
+        if (!canvas || !macd) return;
+
+        const ctx = canvas.getContext('2d');
+
+        if (this.macdChart) {
+            this.macdChart.destroy();
+        }
+
+        this.macdChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['MACD', 'Signal', 'Histogram'],
+                datasets: [{
+                    data: [macd.macd || 0, macd.signal || 0, macd.histogram || 0],
+                    backgroundColor: [
+                        macd.macd > 0 ? '#10b981' : '#ef4444',
+                        '#3b82f6',
+                        macd.histogram > 0 ? '#10b981' : '#ef4444'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: '#9ca3af' },
+                        grid: { color: '#374151' }
+                    },
+                    x: {
+                        ticks: { color: '#9ca3af' },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    }
+
+    createBollingerChart(bollinger) {
+        const canvas = document.getElementById('bollingerChart');
+        if (!canvas || !bollinger) return;
+
+        const ctx = canvas.getContext('2d');
+
+        if (this.bollingerChart) {
+            this.bollingerChart.destroy();
+        }
+
+        const position = bollinger.current_position || 0.5;
+
+        this.bollingerChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Position in Band'],
+                datasets: [{
+                    label: 'Unteres Band',
+                    data: [0],
+                    backgroundColor: '#ef4444'
+                }, {
+                    label: 'Aktuelle Position',
+                    data: [position],
+                    backgroundColor: '#3b82f6'
+                }, {
+                    label: 'Oberes Band',
+                    data: [1 - position],
+                    backgroundColor: '#10b981'
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    x: {
+                        stacked: true,
+                        max: 1,
+                        ticks: {
+                            color: '#9ca3af',
+                            callback: (value) => (value * 100) + '%'
+                        },
+                        grid: { color: '#374151' }
+                    },
+                    y: {
+                        stacked: true,
+                        ticks: { color: '#9ca3af' },
+                        grid: { display: false }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        labels: { color: '#d1d5db' }
+                    }
+                }
+            }
+        });
+    }
+
+    createVolatilityChart(volatility) {
+        const canvas = document.getElementById('volatilityChart');
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d');
+
+        if (this.volatilityChart) {
+            this.volatilityChart.destroy();
+        }
+
+        const volValue = (volatility || 0) * 100;
+
+        this.volatilityChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                datasets: [{
+                    data: [volValue, 100 - volValue],
+                    backgroundColor: [
+                        volValue > 50 ? '#ef4444' : '#3b82f6',
+                        '#1f2937'
+                    ],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                cutout: '75%',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { enabled: false }
+                }
+            },
+            plugins: [{
+                id: 'centerText',
+                afterDraw: (chart) => {
+                    const width = chart.width;
+                    const height = chart.height;
+                    const ctx = chart.ctx;
+                    ctx.restore();
+                    const fontSize = (height / 114).toFixed(2);
+                    ctx.font = fontSize + "em sans-serif";
+                    ctx.textBaseline = "middle";
+                    ctx.fillStyle = '#fff';
+                    const text = volValue.toFixed(1) + '%';
+                    const textX = Math.round((width - ctx.measureText(text).width) / 2);
+                    const textY = height / 2;
+                    ctx.fillText(text, textX, textY);
+                    ctx.save();
+                }
+            }]
+        });
+    }
+
+    createMovingAveragesChart(technical) {
+        const canvas = document.getElementById('movingAveragesChart');
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d');
+
+        if (this.movingAveragesChart) {
+            this.movingAveragesChart.destroy();
+        }
+
+        this.movingAveragesChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['SMA 20', 'SMA 50', 'EMA 12', 'EMA 26'],
+                datasets: [{
+                    label: 'Moving Averages',
+                    data: [
+                        technical.sma_20 || 0,
+                        technical.sma_50 || 0,
+                        technical.ema_12 || 0,
+                        technical.ema_26 || 0
+                    ],
+                    backgroundColor: ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        ticks: {
+                            color: '#9ca3af',
+                            callback: (value) => '$' + value.toFixed(2)
+                        },
+                        grid: { color: '#374151' }
+                    },
+                    x: {
+                        ticks: { color: '#9ca3af' },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
     }
 
     createFundamentalContent(fundamental) {
@@ -451,6 +1000,18 @@ class StockAnalyzerApp {
             pane.classList.remove('active');
         });
         document.getElementById(`${tab}-tab`).classList.add('active');
+
+        // Load AI analysis when AI tab is selected
+        if (tab === 'ai' && this.currentAnalysisTicker) {
+            this.aiVisualizer.renderAnalysis(this.currentAnalysisTicker, this.currentStockPrice);
+        }
+
+        // Initialize technical charts when technical tab is selected
+        if (tab === 'technical' && this.currentTechnicalData) {
+            setTimeout(() => {
+                this.initTechnicalCharts(this.currentTechnicalData);
+            }, 100);
+        }
     }
 
     // Screener functionality
@@ -795,6 +1356,29 @@ class StockAnalyzerApp {
             this.showNotification(`${ticker} zur Watchlist hinzugefügt`, 'success');
         } catch (error) {
             this.showNotification('Fehler beim Hinzufügen zur Watchlist', 'error');
+        }
+    }
+
+    async addToWatchlistFromAnalysis() {
+        if (!this.currentUser) {
+            this.showNotification('Bitte melden Sie sich an', 'error');
+            return;
+        }
+
+        if (!this.currentAnalysisTicker) {
+            this.showNotification('Keine Aktie analysiert', 'error');
+            return;
+        }
+
+        try {
+            await api.addToWatchlist(this.currentAnalysisTicker);
+            this.showNotification(`${this.currentAnalysisTicker} zur Watchlist hinzugefügt`, 'success');
+        } catch (error) {
+            if (error.message && error.message.includes('already exists')) {
+                this.showNotification(`${this.currentAnalysisTicker} ist bereits in der Watchlist`, 'info');
+            } else {
+                this.showNotification('Fehler beim Hinzufügen zur Watchlist', 'error');
+            }
         }
     }
 

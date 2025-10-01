@@ -16,7 +16,7 @@ class AIService:
 
         if self.google_api_key:
             self.provider = 'google'
-            self.api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={self.google_api_key}"
+            self.api_url = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key={self.google_api_key}"
             logger.info("Using Google Gemini AI for stock analysis")
         elif self.openai_api_key:
             self.provider = 'openai'
@@ -91,7 +91,7 @@ class AIService:
                 }
             }
 
-            response = requests.post(self.api_url, json=payload, timeout=30)
+            response = requests.post(self.api_url, json=payload, timeout=60)
 
             if response.status_code == 200:
                 result = response.json()
@@ -178,7 +178,17 @@ Please provide a comprehensive analysis covering:
 2. Fundamental Analysis evaluation
 3. Key Risks to consider
 4. Growth Opportunities
-5. Final Investment Recommendation with reasoning
+5. Price Target - Provide a 12-month price target with justification based on valuation metrics, growth prospects, and market conditions
+6. Short Squeeze Potential - Analyze the likelihood of a short squeeze based on:
+   - Short interest as percentage of float (if high >20% = potential)
+   - Days to cover ratio (if high >5 days = potential)
+   - Recent price momentum and volume spikes
+   - Gamma squeeze potential from options activity
+   - Social media sentiment and retail interest
+   Rate the short squeeze risk from 0-100 (0=no risk, 100=extreme risk) and provide specific reasoning
+7. Final Investment Recommendation (BUY/HOLD/SELL) with clear reasoning
+
+Format your response with clear section headings.
 """
 
         return prompt
@@ -190,6 +200,8 @@ Please provide a comprehensive analysis covering:
             'fundamental_analysis': '',
             'risks': '',
             'opportunities': '',
+            'price_target': '',
+            'short_squeeze': '',
             'recommendation': '',
             'summary': ''
         }
@@ -204,10 +216,14 @@ Please provide a comprehensive analysis covering:
                 current_section = 'technical_analysis'
             elif 'fundamental analysis' in line_lower:
                 current_section = 'fundamental_analysis'
-            elif 'risk' in line_lower:
+            elif 'risk' in line_lower and 'squeeze' not in line_lower:
                 current_section = 'risks'
             elif 'opportunit' in line_lower:
                 current_section = 'opportunities'
+            elif 'price target' in line_lower or 'kursziel' in line_lower:
+                current_section = 'price_target'
+            elif 'short squeeze' in line_lower or 'squeeze potential' in line_lower:
+                current_section = 'short_squeeze'
             elif 'recommendation' in line_lower:
                 current_section = 'recommendation'
             elif current_section:

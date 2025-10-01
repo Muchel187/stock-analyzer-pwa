@@ -21,6 +21,7 @@
     <!-- CSS -->
     <link rel="stylesheet" href="/static/css/styles.css">
     <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/ai-analysis.css">
 
     <!-- Chart.js für Diagramme -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -120,6 +121,29 @@
                     <div class="widget-body">
                         <div id="recommendationsList" class="recommendations loading">
                             <!-- Empfehlungen werden hier eingefügt -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Market Analysis Widget -->
+                <div class="widget widget-full" id="aiRecommendationsWidget">
+                    <div class="widget-header">
+                        <h3>🤖 KI-Marktanalyse: Top Kauf/Verkaufsempfehlungen</h3>
+                        <span class="widget-actions">
+                            <span class="widget-subtitle">US & Deutscher Markt</span>
+                            <button class="btn btn-primary btn-sm" id="aiRefreshBtn" onclick="app.refreshAIRecommendations()">
+                                <span id="aiRefreshIcon">🔄</span>
+                                <span id="aiRefreshText">Aktualisieren</span>
+                            </button>
+                        </span>
+                    </div>
+                    <div class="widget-body">
+                        <div id="aiRecommendationsContent">
+                            <div class="ai-recs-placeholder">
+                                <div class="placeholder-icon">🤖</div>
+                                <p>Klicken Sie auf "Aktualisieren", um KI-gestützte Marktempfehlungen zu erhalten</p>
+                                <p class="placeholder-note">Die Analyse umfasst Top-Aktien aus dem US- und deutschen Markt</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -428,6 +452,7 @@
     <script src="/static/js/api.js"></script>
     <script src="/static/js/components.js"></script>
     <script src="/static/js/charts.js"></script>
+    <script src="/static/js/ai-analysis.js"></script>
     <script src="/static/js/app.js"></script>
 
     <!-- Service Worker Registration -->
