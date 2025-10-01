@@ -1417,7 +1417,7 @@ class StockAnalyzerApp {
 
     // Alert creation and management
     showCreateAlert() {
-        this.openModal('alertModal');
+        this.showModal('alertModal');
         // Clear form
         document.getElementById('alertForm').reset();
     }
@@ -1428,7 +1428,7 @@ class StockAnalyzerApp {
             return;
         }
         
-        this.openModal('alertModal');
+        this.showModal('alertModal');
         // Pre-fill ticker
         document.getElementById('alertTicker').value = ticker.toUpperCase();
         // Clear other fields
