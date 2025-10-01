@@ -2022,6 +2022,7 @@ class StockAnalyzerApp {
                         }
                     },
                     y: {
+                        maxTicksLimit: 8, // Limit number of Y-axis ticks
                         ticks: {
                             color: '#9ca3af',
                             callback: function(value) {

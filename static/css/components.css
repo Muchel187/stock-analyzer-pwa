@@ -1433,11 +1433,18 @@
 
 .compare-chart-card {
     padding: 1.5rem;
+    height: 500px; /* Fixed container height */
+    position: relative; /* Proper positioning */
 }
 
 .compare-chart-card h4 {
     margin: 0 0 1.5rem 0;
     font-size: 1.2rem;
+}
+
+#compareChart {
+    max-height: 400px !important; /* Strict canvas limit */
+    height: 400px !important; /* Fixed canvas height */
 }
 
 @media (max-width: 768px) {
