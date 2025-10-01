@@ -1132,3 +1132,64 @@ scales: {
 - After: Compact 150px height with all data visible
 - User can now see price + volume charts without excessive scrolling
 
+
+### Comparison Chart Height Fix (October 2025)
+
+**Problem:** Normalized price comparison chart extended infinitely downward, similar to volume chart issue.
+
+**Root Cause:**
+- No height constraints on `.compare-chart-card`
+- No max-height on `#compareChart` canvas
+- Too many Y-axis ticks causing vertical expansion
+
+**Solution Implemented:**
+
+**CSS Changes** (`static/css/components.css`):
+```css
+.compare-chart-card {
+    height: 500px;              /* Fixed container height */
+    position: relative;         /* Proper positioning */
+}
+
+#compareChart {
+    max-height: 400px !important;  /* Strict canvas limit */
+    height: 400px !important;      /* Fixed canvas height */
+}
+```
+
+**Chart.js Changes** (`static/js/app.js`):
+```javascript
+scales: {
+    y: {
+        maxTicksLimit: 8,       // Limit to 8 Y-axis labels
+        ...
+    }
+}
+```
+
+**Results:**
+- Comparison chart displays at compact 400px height
+- Container fixed at 500px (including title)
+- Only 8 Y-axis labels for clean appearance
+- No more infinite scrolling in stock comparison
+- Professional, clean appearance
+- Better use of screen space
+
+**Files Modified:**
+- `static/css/components.css` - Height constraints (+5 lines)
+- `static/js/app.js` - Y-axis configuration (+1 line)
+
+**Testing:**
+- ✅ Chart renders at correct height (400px)
+- ✅ No overflow issues
+- ✅ Responsive within constraints
+- ✅ Multiple stock comparison data clearly visible
+- ✅ Professional appearance maintained
+
+**Visual Improvement:**
+- Before: Chart extended 1000+ pixels downward
+- After: Compact 400px height with all comparison data visible
+- User can now compare stocks without excessive scrolling
+
+**Commit:** e18fe4c - "Fix: Comparison chart height overflow - limit to 400px with maxTicksLimit"
+
