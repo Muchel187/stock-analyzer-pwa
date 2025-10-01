@@ -1226,7 +1226,171 @@ scales: {
 - User can now see price + volume charts without excessive scrolling
 
 
+### Volume Chart Height Fix (October 2025)
+
+**Problem:** Volume chart extended infinitely downward on the analysis page, causing poor UX and excessive scrolling.
+
+**Root Cause:**
+- No height constraints on `.volume-chart-container`
+- No max-height on `#volumeChart` canvas
+- Chart.js Y-axis not configured with `beginAtZero`
+- Too many Y-axis ticks causing vertical expansion
+
+**Solution Implemented:**
+
+**CSS Changes** (`static/css/components.css`):
+```css
+.volume-chart-container {
+    height: 200px;              /* Fixed container height */
+    position: relative;         /* Proper positioning */
+}
+
+#volumeChart {
+    max-height: 150px !important;  /* Strict canvas limit */
+    height: 150px !important;      /* Fixed canvas height */
+}
+```
+
+**Chart.js Changes** (`static/js/app.js`):
+```javascript
+scales: {
+    y: {
+        beginAtZero: true,      // Force Y-axis to start at 0
+        maxTicksLimit: 5,       // Limit to 5 Y-axis labels
+        ...
+    }
+}
+```
+
+**Results:**
+- Volume chart now displays at compact 150px height
+- Y-axis starts at 0 for proper proportions
+- Only 5 Y-axis labels reduce visual noise
+- No more infinite scrolling issue
+- Professional, clean appearance
+- Better use of screen space
+
+**Files Modified:**
+- `static/css/components.css` - Height constraints (+7 lines)
+- `static/js/app.js` - Y-axis configuration (+2 lines)
+
+**Testing:**
+- ✅ Chart renders at correct height (150px)
+- ✅ No overflow issues
+- ✅ Responsive within constraints
+- ✅ Data clearly visible and proportional
+- ✅ Professional appearance maintained
+
+**Visual Improvement:**
+- Before: Chart extended 1000+ pixels downward
+- After: Compact 150px height with all data visible
+- User can now see price + volume charts without excessive scrolling
+
+
 ### Comparison Chart Height Fix (October 2025)
+
+**Problem:** Normalized price comparison chart extended infinitely downward, similar to volume chart issue.
+
+**Root Cause:**
+- No height constraints on `.compare-chart-card`
+- No max-height on `#compareChart` canvas
+- Too many Y-axis ticks causing vertical expansion
+
+**Solution Implemented:**
+
+**CSS Changes** (`static/css/components.css`):
+```css
+.compare-chart-card {
+    height: 500px;              /* Fixed container height */
+    position: relative;         /* Proper positioning */
+}
+
+#compareChart {
+    max-height: 400px !important;  /* Strict canvas limit */
+    height: 400px !important;      /* Fixed canvas height */
+}
+```
+
+**Chart.js Changes** (`static/js/app.js`):
+```javascript
+scales: {
+    y: {
+        maxTicksLimit: 8,       /* Limit to 8 Y-axis labels */
+        ...
+    }
+}
+```
+
+**Results:**
+- Comparison chart displays at compact 400px height
+- Container fixed at 500px (including title)
+- Only 8 Y-axis labels for clean appearance
+- No more infinite scrolling in stock comparison
+- Professional, clean appearance
+- Better use of screen space
+
+**Files Modified:**
+- `static/css/components.css` - Height constraints (+5 lines)
+- `static/js/app.js` - Y-axis configuration (+1 line)
+
+**Testing:**
+- ✅ Chart renders at correct height (400px)
+- ✅ No overflow issues
+- ✅ Responsive within constraints
+- ✅ Multiple stock comparison data clearly visible
+- ✅ Professional appearance maintained
+
+**Visual Improvement:**
+- Before: Chart extended 1000+ pixels downward
+- After: Compact 400px height with all comparison data visible
+- User can now compare stocks without excessive scrolling
+
+**Commit:** e18fe4c - "Fix: Comparison chart height overflow - limit to 400px with maxTicksLimit"
+
+### Alert Modal Bug Fix (October 2025)
+
+**Problem:** "Alert erstellen" button in watchlist did nothing when clicked.
+
+**Root Cause:**
+- Incorrect method name used: `openModal()` instead of `showModal()`
+- Two locations affected: `showCreateAlert()` and `createAlertForStock()`
+
+**Solution:**
+```javascript
+// BEFORE (broken):
+this.openModal('alertModal');
+
+// AFTER (fixed):
+this.showModal('alertModal');
+```
+
+**Files Modified:**
+- `static/js/app.js` - Fixed method name in 2 locations
+
+**Testing:**
+- ✅ Alert modal opens from watchlist
+- ✅ Ticker pre-filled correctly
+- ✅ Form fields cleared
+- ✅ Alert creation functional
+
+**Commit:** 05dfa59 - "Fix: Alert modal opening bug - change openModal to showModal"
+
+### CSS Cache Busting (October 2025)
+
+**Problem:** Browser cache preventing new CSS changes from loading (chart heights still broken for users).
+
+**Solution:**
+Added version parameter to CSS imports to force reload:
+```html
+<link rel="stylesheet" href="/static/css/styles.css?v=20251001">
+<link rel="stylesheet" href="/static/css/components.css?v=20251001">
+<link rel="stylesheet" href="/static/css/ai-analysis.css?v=20251001">
+```
+
+**User Action Required:**
+- Hard refresh: `Ctrl+Shift+R` (Windows/Linux) or `Cmd+Shift+R` (Mac)
+
+**Commit:** b88c224 - "Add cache busting to CSS files to fix chart height issues"
 
 **Problem:** Normalized price comparison chart extended infinitely downward, similar to volume chart issue.
 
