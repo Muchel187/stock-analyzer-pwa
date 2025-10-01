@@ -178,10 +178,14 @@ class StockAnalyzerApp {
                 this.refreshPortfolio(),
                 this.refreshWatchlist(),
                 this.refreshRecommendations(),
-                this.refreshAlerts()
+                this.refreshAlerts(),
+                this.refreshNews()
             ]);
         } else {
-            await this.refreshRecommendations();
+            await Promise.all([
+                this.refreshRecommendations(),
+                this.refreshNews()
+            ]);
         }
     }
 
@@ -2118,6 +2122,106 @@ class StockAnalyzerApp {
                 }
             }
         });
+    }
+
+    // ========================================
+    // NEWS FUNCTIONALITY
+    // ========================================
+
+    async refreshNews() {
+        const container = document.getElementById('newsContainer');
+        container.classList.add('loading');
+        container.innerHTML = '<div class="loading-spinner">Loading news...</div>';
+
+        try {
+            const newsData = await api.getMarketNews(15);
+            this.displayNews(newsData.news);
+            container.classList.remove('loading');
+        } catch (error) {
+            console.error('Error loading news:', error);
+            container.classList.remove('loading');
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📰</div>
+                    <div class="empty-state-message">Keine News verfügbar</div>
+                    <div class="empty-state-hint">Fehler beim Laden der Nachrichten</div>
+                </div>
+            `;
+        }
+    }
+
+    async loadStockNews(ticker) {
+        try {
+            const newsData = await api.getStockNews(ticker, 10, 7);
+            return newsData;
+        } catch (error) {
+            console.error(`Error loading news for ${ticker}:`, error);
+            return null;
+        }
+    }
+
+    displayNews(articles) {
+        const container = document.getElementById('newsContainer');
+
+        if (!articles || articles.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📰</div>
+                    <div class="empty-state-message">Keine News verfügbar</div>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = articles.map(article => {
+            const date = article.date ? new Date(article.date).toLocaleString('de-DE', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            }) : 'Unbekannt';
+
+            const sentimentClass = this.getSentimentClass(article.sentiment);
+            const sentimentIcon = this.getSentimentIcon(article.sentiment);
+
+            return `
+                <div class="news-card" onclick="window.open('${article.url}', '_blank')">
+                    ${article.image ? `
+                        <div class="news-thumbnail">
+                            <img src="${article.image}" alt="News thumbnail" onerror="this.parentElement.style.display='none'">
+                        </div>
+                    ` : ''}
+                    <div class="news-content">
+                        <div class="news-header">
+                            <span class="news-source">${article.source}</span>
+                            ${article.sentiment ? `<span class="sentiment-badge ${sentimentClass}">${sentimentIcon} ${article.sentiment}</span>` : ''}
+                        </div>
+                        <h4 class="news-headline">${article.headline}</h4>
+                        ${article.summary ? `<p class="news-summary">${article.summary}</p>` : ''}
+                        <div class="news-footer">
+                            <span class="news-date">${date}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    getSentimentClass(sentiment) {
+        switch(sentiment) {
+            case 'bullish': return 'sentiment-bullish';
+            case 'bearish': return 'sentiment-bearish';
+            default: return 'sentiment-neutral';
+        }
+    }
+
+    getSentimentIcon(sentiment) {
+        switch(sentiment) {
+            case 'bullish': return '🟢';
+            case 'bearish': return '🔴';
+            default: return '⚪';
+        }
     }
 }
 
