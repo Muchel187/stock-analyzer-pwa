@@ -76,7 +76,7 @@ def create_app(config_name='default'):
             return None
 
     # Register blueprints
-    from app.routes import auth, stock, portfolio, watchlist, screener, alerts, main, admin
+    from app.routes import auth, stock, portfolio, watchlist, screener, alerts, main, admin, financial
     app.register_blueprint(auth.bp)
     app.register_blueprint(stock.bp)
     app.register_blueprint(portfolio.bp)
@@ -85,6 +85,7 @@ def create_app(config_name='default'):
     app.register_blueprint(alerts.bp)
     app.register_blueprint(main.bp)
     app.register_blueprint(admin.bp)
+    app.register_blueprint(financial.bp)
 
     # Setup logging
     if not app.debug and not app.testing:
