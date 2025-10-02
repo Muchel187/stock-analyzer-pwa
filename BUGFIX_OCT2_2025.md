@@ -1,5 +1,34 @@
 # Bugfix-Zusammenfassung - 2. Oktober 2025
 
+## Neue Features ✨
+
+### 1. Watchlist AI Analysis Button ✅ (2025-10-02)
+**Feature:** Direkt-Zugriff auf KI-Analyse aus der Watchlist
+
+**Implementierung:**
+- Neuer "KI" Button neben jedem Watchlist-Eintrag
+- Automatische Navigation zur Analyse-Seite
+- Auto-Wechsel zum "KI-Analyse" Tab
+- Gradient-Purple Styling mit Pulsierender 🤖 Icon Animation
+
+**Technische Details:**
+- `static/js/app.js`: Neue `analyzeWithAI(ticker)` Methode (Zeilen 553-589)
+- `static/css/components.css`: `.btn-ai-analyze` Styling mit Pulse-Animation (Zeilen 77-119)
+- Event-Handling: `event.stopPropagation()` verhindert Konflikt mit Parent-Klick
+- UX: 1-Sekunden Verzögerung vor Tab-Wechsel für saubere Animation
+
+**Benutzer-Flow:**
+1. Watchlist anzeigen
+2. Auf "KI" Button klicken
+3. → Navigation zur Analyse-Seite
+4. → Stock-Analyse wird geladen
+5. → KI-Analyse Tab öffnet automatisch
+
+**Commit:** 1799fde
+**Dokumentation:** WATCHLIST_AI_BUTTON.md
+
+---
+
 ## Behobene Probleme
 
 ### 1. Database Duplicate Key Error ✅
