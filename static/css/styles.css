@@ -7,6 +7,14 @@
     --warning-color: #ed8936;
     --info-color: #4299e1;
 
+    /* RGB values for colors (for rgba use) */
+    --primary-rgb: 102, 126, 234;
+    --secondary-rgb: 118, 75, 162;
+    --success-rgb: 72, 187, 120;
+    --danger-rgb: 245, 101, 101;
+    --warning-rgb: 237, 137, 54;
+    --info-rgb: 66, 153, 225;
+
     --bg-primary: #ffffff;
     --bg-secondary: #f7fafc;
     --bg-dark: #2d3748;
