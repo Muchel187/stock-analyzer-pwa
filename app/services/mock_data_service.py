@@ -270,50 +270,154 @@ class MockDataService:
 
     @staticmethod
     def get_mock_ai_analysis(ticker: str, stock_data: Dict = None) -> Dict[str, Any]:
-        """Generate mock AI analysis"""
+        """Generate comprehensive mock AI analysis matching real Gemini format"""
         ticker = ticker.upper()
 
-        recommendations = ['Strong Buy', 'Buy', 'Hold', 'Sell', 'Strong Sell']
+        recommendations = ['KAUFEN', 'HALTEN', 'VERKAUFEN']
         recommendation = random.choice(recommendations)
 
         base_price = stock_data.get('current_price', 250) if stock_data else 250
-        price_target = round(base_price * random.uniform(0.85, 1.15), 2)
+        price_target = round(base_price * random.uniform(0.90, 1.12), 2)
+
+        # Generate realistic technical data
+        rsi = round(random.uniform(35, 70), 1)
+        macd_signal = random.choice(['bullish', 'bearish', 'neutral'])
+
+        # Generate realistic fundamental strengths
+        fundamentals = random.choice([
+            ('starke', 'wachsende'),
+            ('solide', 'stabile'),
+            ('moderate', 'gemischte'),
+            ('schwache', 'rückläufige')
+        ])
+
+        # Generate risks and opportunities
+        risks_pool = [
+            ('Marktvolatilität', 'Erhöhte Schwankungen könnten kurzfristige Verluste verursachen.'),
+            ('Zinsrisiko', 'Steigende Zinsen könnten die Bewertung belasten.'),
+            ('Wettbewerbsdruck', 'Neue Konkurrenten könnten Marktanteile erobern.'),
+            ('Regulatorische Änderungen', 'Neue Vorschriften könnten Kosten erhöhen.'),
+            ('Makroökonomische Unsicherheit', 'Rezessionsrisiken belasten die Aussichten.'),
+            ('Technologische Disruption', 'Neue Technologien könnten Geschäftsmodell gefährden.')
+        ]
+
+        opportunities_pool = [
+            ('Marktexpansion', 'Wachstumspotenzial in neuen Märkten, besonders in Asien.'),
+            ('Produktinnovation', 'Neue Produktlinien könnten Umsatzwachstum treiben.'),
+            ('Kostenoptimierung', 'Effizienzsteigerungen verbessern Margen.'),
+            ('Strategische Partnerschaften', 'Kooperationen erweitern Kundenbasis.'),
+            ('Digitale Transformation', 'Cloud-Migration erhöht Wettbewerbsfähigkeit.'),
+            ('M&A-Potenzial', 'Akquisitionen könnten Marktposition stärken.')
+        ]
+
+        # Select 3-4 risks and opportunities
+        selected_risks = random.sample(risks_pool, k=random.randint(3, 4))
+        selected_opportunities = random.sample(opportunities_pool, k=random.randint(3, 4))
 
         return {
             'ticker': ticker,
             'analysis': f"""
-## Mock AI Analysis for {ticker}
+## 1. TECHNISCHE ANALYSE 📈
 
-**Note: This is mock data generated due to API limitations.**
+**Überblick:** Die technische Analyse von {ticker} zeigt ein {random.choice(['vielversprechendes', 'neutrales', 'gemischtes'])} Bild mit mehreren wichtigen Indikatoren.
 
-### Technical Analysis
-The stock is showing mixed signals with RSI at neutral levels and MACD suggesting consolidation.
-Moving averages indicate a sideways trend with potential for breakout.
+**RSI (Relative Strength Index):** {rsi}
+- Der RSI liegt bei {rsi}, was auf {('überkaufte' if rsi > 70 else 'überverkaufte' if rsi < 30 else 'neutrale')} Bedingungen hindeutet.
+- Empfehlung: {('Vorsicht bei Neueinsteigen' if rsi > 70 else 'Potenzielle Kaufgelegenheit' if rsi < 30 else 'Normales Handelsniveau')}
 
-### Fundamental Analysis
-The company shows {random.choice(['strong', 'moderate', 'weak'])} fundamentals with
-{random.choice(['improving', 'stable', 'declining'])} profit margins.
+**MACD (Moving Average Convergence Divergence):**
+- Signal: {macd_signal.capitalize()}
+- Der MACD zeigt ein {macd_signal}es Signal, was {('steigende Kurse' if macd_signal == 'bullish' else 'fallende Kurse' if macd_signal == 'bearish' else 'Seitwärtsbewegung')} nahelegt.
 
-### Market Sentiment
-Current market sentiment is {random.choice(['bullish', 'neutral', 'bearish'])}
-based on recent trading patterns.
+**Gleitende Durchschnitte:**
+- SMA 20: ${round(base_price * random.uniform(0.98, 1.02), 2)}
+- SMA 50: ${round(base_price * random.uniform(0.95, 1.05), 2)}
+- SMA 200: ${round(base_price * random.uniform(0.90, 1.10), 2)}
 
-### Risks
-- Market volatility
-- Sector rotation risk
-- Regulatory changes
+Der Kurs liegt {random.choice(['über', 'unter', 'nahe'])} dem 200-Tage-Durchschnitt, was auf einen {random.choice(['Aufwärts', 'Abwärts', 'Seitwärts'])}-Trend hindeutet.
 
-### Opportunities
-- Growth potential in emerging markets
-- Product innovation pipeline
-- Strategic partnerships
+**Bollinger Bänder:**
+- Die Aktie bewegt sich {random.choice(['im mittleren Bereich', 'am oberen Band', 'am unteren Band'])} der Bollinger Bänder.
+- Volatilität: {random.choice(['Erhöht', 'Normal', 'Niedrig'])}
+
+## 2. FUNDAMENTALANALYSE 💼
+
+**Unternehmensstärke:** {ticker} zeigt {fundamentals[0]} Fundamentaldaten mit {fundamentals[1]} Geschäftsentwicklung.
+
+**Bewertungskennzahlen:**
+- P/E Ratio: {round(random.uniform(15, 40), 1)}x
+- P/B Ratio: {round(random.uniform(2, 8), 1)}x
+- PEG Ratio: {round(random.uniform(0.8, 2.5), 2)}
+
+**Profitabilität:**
+- Gewinnmarge: {round(random.uniform(8, 25), 1)}%
+- ROE (Return on Equity): {round(random.uniform(10, 30), 1)}%
+- Verschuldungsgrad: {round(random.uniform(0.3, 1.5), 2)}
+
+**Wachstum:**
+- Umsatzwachstum (YoY): {round(random.uniform(-5, 15), 1)}%
+- Gewinnwachstum (YoY): {round(random.uniform(-10, 20), 1)}%
+
+Die Fundamentaldaten deuten auf ein {random.choice(['stabiles', 'wachsendes', 'herausforderndes'])} Geschäftsmodell hin.
+
+## 3. HAUPTRISIKEN ⚠️
+
+{''.join([f"**Risiko {i+1}: {risk[0]}**\n{risk[1]}\n\n" for i, risk in enumerate(selected_risks)])}
+
+## 4. CHANCEN 🎯
+
+{''.join([f"**Chance {i+1}: {opp[0]}**\n{opp[1]}\n\n" for i, opp in enumerate(selected_opportunities)])}
+
+## 5. KURSZIEL 🎯
+
+**12-Monats-Kursziel:** ${price_target}
+**Aktueller Kurs:** ${base_price}
+**Potenzial:** {round(((price_target / base_price) - 1) * 100, 1)}%
+
+**Bewertungsmethode:** Kombinierte DCF-Analyse und Peer-Vergleich
+
+**Kurszielspanne:**
+- Bear Case: ${round(base_price * 0.85, 2)}
+- Base Case: ${price_target}
+- Bull Case: ${round(base_price * 1.20, 2)}
+
+## 6. SHORT SQUEEZE POTENZIAL 🔥
+
+**Squeeze Score:** {random.randint(10, 40)}/100
+
+**Due Diligence Faktoren:**
+- Short Interest: ~{round(random.uniform(3, 15), 1)}% des Float
+- Days to Cover: ~{round(random.uniform(1.5, 5), 1)} Tage
+- Borrowing Costs: {random.choice(['Niedrig', 'Moderat', 'Erhöht'])}
+
+**Analyse:** Das Short-Squeeze-Potenzial ist aktuell als {random.choice(['gering', 'moderat', 'erhöht'])} einzustufen. Die Short-Quote liegt im {random.choice(['unteren', 'mittleren'])} Bereich.
+
+## 7. INVESTMENTEMPFEHLUNG 📊
+
+**Urteil:** **{recommendation}**
+
+**Begründung:**
+Basierend auf der umfassenden Analyse empfehlen wir {recommendation.upper()}. Die {fundamentals[0]}n Fundamentaldaten und die {random.choice(['positive', 'neutrale', 'gemischte'])} technische Lage rechtfertigen diese Einschätzung.
+
+**Hauptfaktoren:**
+1. **Bewertung:** {random.choice(['Fair bewertet', 'Leicht überbewertet', 'Attraktiv bewertet'])}
+2. **Wachstumsperspektiven:** {random.choice(['Vielversprechend', 'Moderat', 'Begrenzt'])}
+3. **Risiko-Ertrags-Verhältnis:** {random.choice(['Ausgewogen', 'Konservativ', 'Risikoreich'])}
+
+**Zeithorizont:**
+- Kurzfristig (0-3 Monate): {random.choice(['HALTEN', 'KAUFEN', 'VERKAUFEN'])}
+- Mittelfristig (3-12 Monate): {recommendation}
+- Langfristig (1+ Jahre): {random.choice(['KAUFEN', 'HALTEN'])}
+
+---
+*Hinweis: Dies sind Mock-Daten für Demonstrationszwecke während API-Ausfällen. Echte Gemini AI-Analysen sind bei verfügbarem API-Kontingent deutlich detaillierter.*
             """,
             'recommendation': recommendation,
-            'confidence_score': round(random.uniform(60, 85), 1),
+            'confidence_score': round(random.uniform(65, 90), 1),
             'price_target': price_target,
-            'risk_level': random.choice(['Low', 'Medium', 'High']),
+            'risk_level': random.choice(['Niedrig', 'Mittel', 'Hoch']),
             'source': 'mock_ai',
-            'warning': 'This is mock AI analysis for demonstration purposes'
+            'warning': 'Mock-Analyse während API-Quota-Überschreitung - Wartet auf Gemini API Reset'
         }
 
     @staticmethod
