@@ -337,12 +337,18 @@ class FallbackDataService:
     """
     Coordinated fallback service that tries multiple data sources in order,
     including AI fallback when all traditional APIs are exhausted
+
+    Priority Order:
+    1. Twelve Data (Primary) - Best for real-time data, WebSocket support, 800 req/day
+    2. Finnhub (Secondary) - Good fallback, 60 req/min
+    3. Alpha Vantage (Tertiary) - Last resort, 25 req/day
+    4. AI Fallback (Ultimate) - When all APIs fail
     """
 
-    # Order of preference for data sources
+    # Order of preference for data sources (Twelve Data first!)
     SOURCES = [
-        ('finnhub', FinnhubService),
         ('twelve_data', TwelveDataService),
+        ('finnhub', FinnhubService),
         ('alpha_vantage', AlphaVantageService),
     ]
 
