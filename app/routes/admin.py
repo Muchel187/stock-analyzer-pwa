@@ -2,14 +2,37 @@
 Admin Routes - API endpoints for admin operations
 """
 from flask import Blueprint, jsonify, request
-from flask_jwt_extended import get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.middleware.admin_required import admin_required
 from app.services.admin_service import AdminService
+from app.models import User
+from app import db
 import logging
 
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('admin', __name__, url_prefix='/api/admin')
+
+@bp.route('/check', methods=['GET'])
+@jwt_required()
+def check_admin():
+    """Check if current user is admin"""
+    try:
+        current_user = get_jwt_identity()
+        user = db.session.get(User, int(current_user))
+
+        if not user or not user.is_admin:
+            return jsonify({'error': 'Not authorized'}), 403
+
+        return jsonify({
+            'is_admin': True,
+            'username': user.username,
+            'user_id': user.id
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error checking admin status: {str(e)}")
+        return jsonify({'error': 'Failed to check admin status'}), 500
 
 @bp.route('/users', methods=['GET'])
 @admin_required
@@ -139,8 +162,3 @@ def get_system_stats():
         logger.error(f"Error getting system stats: {str(e)}")
         return jsonify({'error': 'Failed to get system statistics'}), 500
 
-@bp.route('/check', methods=['GET'])
-@admin_required
-def check_admin():
-    """Check if current user is admin"""
-    return jsonify({'is_admin': True}), 200

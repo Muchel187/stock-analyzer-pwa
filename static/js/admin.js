@@ -19,7 +19,7 @@ class AdminApp {
      */
     async init() {
         // Check if user is admin
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('access_token');
         if (!token) {
             window.location.href = '/';
             return;
@@ -435,7 +435,8 @@ class AdminApp {
      * Logout
      */
     logout() {
-        localStorage.removeItem('token');
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
         localStorage.removeItem('username');
         window.location.href = '/';
     }
@@ -541,8 +542,7 @@ class AdminApp {
     }
 }
 
-// Initialize on page load
-document.addEventListener('DOMContentLoaded', () => {
-    window.adminApp = new AdminApp();
-    window.adminApp.init();
-});
+// Export for use in other scripts
+if (typeof window !== 'undefined') {
+    window.AdminApp = AdminApp;
+}
