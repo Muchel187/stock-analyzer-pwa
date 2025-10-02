@@ -16,11 +16,11 @@ class AIService:
 
         if self.google_api_key:
             self.provider = 'google'
-            self.provider_name = 'Google Gemini 2.5 Pro'
-            # Using Gemini 2.5 Pro (October 2025 - production-ready, enhanced reasoning)
-            # Gemini 2.5 Pro offers superior analysis capabilities compared to Flash
-            self.api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={self.google_api_key}"
-            logger.info("Using Google Gemini 2.5 Pro for stock analysis")
+            self.provider_name = 'Google Gemini 2.0 Flash Experimental'
+            # Using Gemini 2.0 Flash Experimental (higher rate limits, faster responses)
+            # Flash Experimental has better quota management compared to Pro
+            self.api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key={self.google_api_key}"
+            logger.info("Using Google Gemini 2.0 Flash Experimental for stock analysis")
         elif self.openai_api_key:
             self.provider = 'openai'
             self.provider_name = 'OpenAI GPT-4'
@@ -347,14 +347,14 @@ Base the data on realistic price movements for this stock. Use your knowledge of
 
             if response.status_code == 200:
                 result = response.json()
-                
+
                 # Enhanced error handling for different response formats
                 if 'candidates' in result and len(result['candidates']) > 0:
                     candidate = result['candidates'][0]
-                    
+
                     if 'content' in candidate:
                         content = candidate['content']
-                        
+
                         # Check for parts
                         if 'parts' in content and len(content['parts']) > 0:
                             if 'text' in content['parts'][0]:
@@ -368,7 +368,11 @@ Base the data on realistic price movements for this stock. Use your knowledge of
                         logger.error(f"No 'content' in candidate. Candidate keys: {candidate.keys()}")
                 else:
                     logger.error(f"No candidates in result. Result keys: {result.keys()}")
-                
+
+                return None
+            elif response.status_code == 429:
+                # Rate limit hit - return None to trigger mock data fallback
+                logger.warning(f"Google Gemini rate limit exceeded (429). Falling back to mock data.")
                 return None
             else:
                 logger.error(f"Google Gemini API error: {response.status_code} - {response.text}")
