@@ -32,7 +32,8 @@ class AIService:
 
     def analyze_stock_with_ai(self, stock_data: Dict[str, Any],
                                technical_indicators: Dict[str, Any] = None,
-                               fundamental_analysis: Dict[str, Any] = None) -> Optional[Dict[str, Any]]:
+                               fundamental_analysis: Dict[str, Any] = None,
+                               short_data: Dict[str, Any] = None) -> Optional[Dict[str, Any]]:
         """Generate AI-powered analysis for a stock"""
         if not self.provider:
             logger.warning("No AI API key configured")
@@ -42,7 +43,7 @@ class AIService:
             }
 
         try:
-            prompt = self._create_analysis_prompt(stock_data, technical_indicators, fundamental_analysis)
+            prompt = self._create_analysis_prompt(stock_data, technical_indicators, fundamental_analysis, short_data)
 
             if self.provider == 'google':
                 analysis_text = self._call_google_gemini(prompt)
@@ -138,7 +139,8 @@ class AIService:
 
     def _create_analysis_prompt(self, stock_data: Dict[str, Any],
                                 technical_indicators: Dict[str, Any] = None,
-                                fundamental_analysis: Dict[str, Any] = None) -> str:
+                                fundamental_analysis: Dict[str, Any] = None,
+                                short_data: Dict[str, Any] = None) -> str:
         """Create a comprehensive prompt for AI analysis"""
         prompt = f"""
 Analyze the following stock data for {stock_data.get('ticker', 'Unknown')} ({stock_data.get('company_name', 'Unknown Company')}):
@@ -179,9 +181,25 @@ Please provide a comprehensive analysis covering:
 3. Key Risks to consider
 4. Growth Opportunities
 5. Price Target - Provide a 12-month price target with justification based on valuation metrics, growth prospects, and market conditions
+"""
+
+        # Add short data section if available
+        if short_data:
+            prompt += f"""
+## SHORT INTEREST DATA (from ChartExchange.com):
+- Short Interest: {short_data.get('short_interest', 'N/A')} shares
+- Short % of Float: {short_data.get('short_percent_of_float', 'N/A')}%
+- Days to Cover: {short_data.get('days_to_cover', 'N/A')}
+- Failure to Deliver: {short_data.get('failure_to_deliver', 'N/A')} shares
+- Last Updated: {short_data.get('last_updated', 'N/A')}
+"""
+
+        prompt += """
 6. Short Squeeze Potential - Analyze the likelihood of a short squeeze based on:
+   - Actual short interest data from ChartExchange (if available above)
    - Short interest as percentage of float (if high >20% = potential)
    - Days to cover ratio (if high >5 days = potential)
+   - Failure to deliver data indicates naked shorting pressure
    - Recent price momentum and volume spikes
    - Gamma squeeze potential from options activity
    - Social media sentiment and retail interest

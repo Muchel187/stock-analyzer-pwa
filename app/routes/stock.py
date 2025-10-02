@@ -66,17 +66,37 @@ def analyze_with_ai_get(ticker):
         technical = StockService.calculate_technical_indicators(ticker)
         fundamental = StockService.get_fundamental_analysis(ticker)
 
+        # Analyze short squeeze potential
+        from app.services.short_squeeze_analyzer import ShortSqueezeAnalyzer
+        squeeze_analysis = ShortSqueezeAnalyzer.analyze_squeeze_potential(
+            stock_info,
+            technical,
+            {'volume': stock_info.get('volume')}
+        )
+
+        # Try to get actual short data from ChartExchange
+        from app.services.short_data_service import ShortDataService
+        short_data = ShortDataService.get_short_data(ticker)
+
+        # If we have real short data, enhance the squeeze analysis
+        if short_data:
+            squeeze_analysis['real_short_data'] = short_data
+            squeeze_analysis['note'] = 'Enhanced with actual short interest data from ChartExchange.com'
+
         # Generate AI analysis
         ai_service = AIService()
         ai_analysis = ai_service.analyze_stock_with_ai(
             stock_info,
             technical,
-            fundamental
+            fundamental,
+            short_data
         )
 
         if not ai_analysis:
             return jsonify({'error': 'AI analysis failed'}), 500
 
+        # Add squeeze analysis to response
+        ai_analysis['squeeze_analysis'] = squeeze_analysis
         ai_analysis['timestamp'] = datetime.now(timezone.utc).isoformat()
 
         return jsonify(ai_analysis), 200
@@ -103,17 +123,37 @@ def analyze_with_ai():
         technical = StockService.calculate_technical_indicators(ticker)
         fundamental = StockService.get_fundamental_analysis(ticker)
 
+        # Analyze short squeeze potential
+        from app.services.short_squeeze_analyzer import ShortSqueezeAnalyzer
+        squeeze_analysis = ShortSqueezeAnalyzer.analyze_squeeze_potential(
+            stock_info,
+            technical,
+            {'volume': stock_info.get('volume')}
+        )
+
+        # Try to get actual short data from ChartExchange
+        from app.services.short_data_service import ShortDataService
+        short_data = ShortDataService.get_short_data(ticker)
+
+        # If we have real short data, enhance the squeeze analysis
+        if short_data:
+            squeeze_analysis['real_short_data'] = short_data
+            squeeze_analysis['note'] = 'Enhanced with actual short interest data from ChartExchange.com'
+
         # Generate AI analysis
         ai_service = AIService()
         ai_analysis = ai_service.analyze_stock_with_ai(
             stock_info,
             technical,
-            fundamental
+            fundamental,
+            short_data
         )
 
         if not ai_analysis:
             return jsonify({'error': 'AI analysis failed'}), 500
 
+        # Add squeeze analysis to response
+        ai_analysis['squeeze_analysis'] = squeeze_analysis
         ai_analysis['timestamp'] = datetime.now(timezone.utc).isoformat()
 
         return jsonify(ai_analysis), 200
