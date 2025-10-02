@@ -24,7 +24,15 @@
 4. → Stock-Analyse wird geladen
 5. → KI-Analyse Tab öffnet automatisch
 
-**Commit:** 1799fde
+**Commits:**
+- 1799fde - Feature implementation
+- 6260e0e - Fix navigation method name
+
+**Bugfix (6260e0e):**
+- Problem: `TypeError: this.showPage is not a function` beim Klicken auf KI Button
+- Ursache: Falsche Methode verwendet (`showPage` statt `navigateToPage`)
+- Lösung: Beide Methoden (`navigateToAnalysis` und `analyzeWithAI`) korrigiert
+
 **Dokumentation:** WATCHLIST_AI_BUTTON.md
 
 ---
