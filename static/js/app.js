@@ -1403,13 +1403,20 @@ class StockAnalyzerApp {
         }
 
         const container = document.getElementById('portfolioDetails');
+        if (!container) {
+            console.error('Portfolio container not found');
+            return;
+        }
+
         container.classList.add('loading');
 
         try {
             const portfolio = await api.getPortfolio();
+            console.log('Portfolio loaded:', portfolio); // Debug log
             container.classList.remove('loading');
             this.displayPortfolioDetails(portfolio);
         } catch (error) {
+            console.error('Error loading portfolio:', error);
             container.classList.remove('loading');
             this.showNotification('Portfolio konnte nicht geladen werden', 'error');
         }
@@ -2479,10 +2486,19 @@ class StockAnalyzerApp {
             this.showNotification(`Transaktion für ${ticker} erfolgreich hinzugefügt`, 'success');
             this.closeModal('transactionModal');
 
-            // Refresh portfolio if on portfolio page
+            // Refresh portfolio on both dashboard and portfolio page
             if (this.currentPage === 'portfolio') {
                 await this.loadPortfolio();
+            } else if (this.currentPage === 'dashboard') {
+                await this.refreshPortfolio();
             }
+
+            // Also reload to ensure visibility
+            setTimeout(async () => {
+                if (this.currentPage === 'portfolio') {
+                    await this.loadPortfolio();
+                }
+            }, 500);
         } catch (error) {
             console.error('Error adding transaction:', error);
             this.showNotification(error.message || 'Fehler beim Hinzufügen der Transaktion', 'error');

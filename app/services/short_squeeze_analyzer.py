@@ -139,6 +139,15 @@ class ShortSqueezeAnalyzer:
             # Add recommendations based on level
             recommendations = cls._get_squeeze_recommendations(level, factors)
 
+            # Calculate squeeze price target scenarios
+            current_price = stock_data.get('current_price', 0)
+            price_scenarios = cls._calculate_squeeze_scenarios(
+                current_price,
+                score,
+                level,
+                technical_data
+            )
+
             return {
                 'score': score,
                 'risk_level': risk_level,
@@ -147,6 +156,7 @@ class ShortSqueezeAnalyzer:
                 'factors': factors,
                 'signals': signals,
                 'recommendations': recommendations,
+                'price_scenarios': price_scenarios,
                 'analysis_timestamp': datetime.now(timezone.utc).isoformat(),
                 'note': 'Analysis based on technical indicators and market dynamics. Actual short interest data from ChartExchange.com would improve accuracy.'
             }
@@ -190,3 +200,157 @@ class ShortSqueezeAnalyzer:
             recommendations.append("Normal trading conditions")
 
         return recommendations
+
+    @classmethod
+    def _calculate_squeeze_scenarios(cls, current_price: float, score: int,
+                                    level: str, technical_data: Dict = None) -> Dict:
+        """
+        Calculate 3 hypothetical price target scenarios for a potential short squeeze
+
+        Args:
+            current_price: Current stock price
+            score: Squeeze score (0-100)
+            level: Squeeze level (MINIMAL to EXTREME)
+            technical_data: Technical indicators for additional context
+
+        Returns:
+            Dictionary with 3 scenarios: Conservative, Base, Aggressive
+        """
+        if not current_price or current_price <= 0:
+            return {
+                'error': 'Invalid price data',
+                'scenarios': []
+            }
+
+        try:
+            # Base multipliers based on squeeze level
+            level_multipliers = {
+                'EXTREME': {'conservative': 1.5, 'base': 2.5, 'aggressive': 5.0},
+                'HIGH': {'conservative': 1.3, 'base': 1.8, 'aggressive': 3.0},
+                'MODERATE': {'conservative': 1.15, 'base': 1.4, 'aggressive': 2.0},
+                'LOW': {'conservative': 1.08, 'base': 1.2, 'aggressive': 1.5},
+                'MINIMAL': {'conservative': 1.03, 'base': 1.08, 'aggressive': 1.2}
+            }
+
+            multipliers = level_multipliers.get(level, level_multipliers['MINIMAL'])
+
+            # Adjust based on technical indicators if available
+            adjustment = 1.0
+            if technical_data:
+                # RSI factor
+                rsi = technical_data.get('rsi')
+                if rsi and rsi > 70:
+                    adjustment *= 1.1  # Overbought - higher squeeze potential
+                elif rsi and rsi < 30:
+                    adjustment *= 1.2  # Oversold - bigger bounce potential
+
+                # Volatility factor
+                volatility = technical_data.get('volatility')
+                if volatility and volatility > 0.5:
+                    adjustment *= 1.15  # High volatility = bigger moves
+
+            # Calculate the three scenarios
+            scenarios = [
+                {
+                    'name': 'Konservativ',
+                    'description': 'Moderater Squeeze mit teilweiser Short-Eindeckung',
+                    'target_price': round(current_price * multipliers['conservative'] * adjustment, 2),
+                    'upside_percent': round((multipliers['conservative'] * adjustment - 1) * 100, 1),
+                    'probability': cls._get_probability(score, 'conservative'),
+                    'timeframe': '1-2 Wochen',
+                    'triggers': [
+                        'Positive Nachrichten oder Earnings Beat',
+                        'Leichter Anstieg des Kaufvolumens',
+                        'Erste Welle von Short-Eindeckungen'
+                    ]
+                },
+                {
+                    'name': 'Basis-Szenario',
+                    'description': 'Signifikanter Squeeze mit Momentum-Aufbau',
+                    'target_price': round(current_price * multipliers['base'] * adjustment, 2),
+                    'upside_percent': round((multipliers['base'] * adjustment - 1) * 100, 1),
+                    'probability': cls._get_probability(score, 'base'),
+                    'timeframe': '2-4 Wochen',
+                    'triggers': [
+                        'Starker Katalysator (Partnership, FDA-Zulassung, etc.)',
+                        'Massiver Volumenanstieg (3-5x normal)',
+                        'Kaskadierende Short-Eindeckungen',
+                        'Social Media Momentum (Reddit, Twitter)'
+                    ]
+                },
+                {
+                    'name': 'Aggressiv',
+                    'description': 'Extremer Squeeze mit parabolischer Bewegung',
+                    'target_price': round(current_price * multipliers['aggressive'] * adjustment, 2),
+                    'upside_percent': round((multipliers['aggressive'] * adjustment - 1) * 100, 1),
+                    'probability': cls._get_probability(score, 'aggressive'),
+                    'timeframe': '1-3 Monate',
+                    'triggers': [
+                        'Perfekter Sturm mehrerer Katalysatoren',
+                        'Gamma Squeeze durch Optionen',
+                        'Institutionelle FOMO-Käufe',
+                        'Viraler Social Media Hype',
+                        'Margin Calls bei Short-Positionen'
+                    ]
+                }
+            ]
+
+            # Add warning based on risk level
+            warning = cls._get_scenario_warning(level)
+
+            return {
+                'current_price': current_price,
+                'scenarios': scenarios,
+                'warning': warning,
+                'methodology': 'Szenarien basierend auf historischen Squeeze-Mustern und technischen Indikatoren'
+            }
+
+        except Exception as e:
+            logger.error(f"Error calculating squeeze scenarios: {str(e)}")
+            return {
+                'error': str(e),
+                'scenarios': []
+            }
+
+    @classmethod
+    def _get_probability(cls, score: int, scenario_type: str) -> str:
+        """Calculate probability for each scenario based on squeeze score"""
+        if scenario_type == 'conservative':
+            if score >= 80:
+                return 'Hoch (70-80%)'
+            elif score >= 60:
+                return 'Mittel-Hoch (50-70%)'
+            elif score >= 40:
+                return 'Mittel (30-50%)'
+            else:
+                return 'Niedrig (<30%)'
+        elif scenario_type == 'base':
+            if score >= 80:
+                return 'Mittel-Hoch (40-60%)'
+            elif score >= 60:
+                return 'Mittel (25-40%)'
+            elif score >= 40:
+                return 'Niedrig-Mittel (15-25%)'
+            else:
+                return 'Sehr Niedrig (<15%)'
+        else:  # aggressive
+            if score >= 80:
+                return 'Mittel (20-35%)'
+            elif score >= 60:
+                return 'Niedrig (10-20%)'
+            elif score >= 40:
+                return 'Sehr Niedrig (5-10%)'
+            else:
+                return 'Minimal (<5%)'
+
+    @classmethod
+    def _get_scenario_warning(cls, level: str) -> str:
+        """Get appropriate warning message based on squeeze level"""
+        warnings = {
+            'EXTREME': '⚠️ EXTREME WARNUNG: Sehr hohes Risiko! Diese Szenarien sind hochspekulativ. Short Squeezes können schnell verpuffen.',
+            'HIGH': '⚠️ HOHE VOLATILITÄT: Signifikantes Risiko. Kurse können sich schnell in beide Richtungen bewegen.',
+            'MODERATE': '⚠️ VORSICHT: Moderate Squeeze-Wahrscheinlichkeit. Szenarien sind hypothetisch.',
+            'LOW': 'ℹ️ HINWEIS: Geringe Squeeze-Wahrscheinlichkeit. Szenarien sind optimistisch.',
+            'MINIMAL': 'ℹ️ INFO: Minimale Squeeze-Anzeichen. Szenarien sind hochspekulativ.'
+        }
+        return warnings.get(level, 'Szenarien sind hypothetisch und keine Anlageberatung.')

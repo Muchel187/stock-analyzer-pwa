@@ -19,12 +19,23 @@ class ScreenerService:
         'GS', 'AMGN', 'SBUX', 'CAT', 'BA', 'GE', 'MMM', 'MCD', 'F', 'GM'
     ]
 
-    # DAX 40 stocks
+    # DAX 40 stocks with both formats (with .DE and without for better API compatibility)
     DAX_STOCKS = [
+        # Major German stocks that often work without .DE suffix in APIs
+        'SAP', 'SIE', 'BMW', 'BAS', 'DAI', 'ALV', 'BAYN', 'ADS', 'DBK', 'DTE',
+        # Full list with .DE suffix for German exchanges
         'ADS.DE', 'AIR.DE', 'ALV.DE', 'BAS.DE', 'BAYN.DE', 'BEI.DE', 'BMW.DE', 'CON.DE',
         'DAI.DE', 'DBK.DE', 'DHL.DE', 'DTE.DE', 'EOAN.DE', 'FRE.DE', 'HEI.DE', 'HEN3.DE',
         'IFX.DE', 'LIN.DE', 'MRK.DE', 'MTX.DE', 'MUV2.DE', 'PAH3.DE', 'PUM.DE', 'RWE.DE',
         'SAP.DE', 'SIE.DE', 'SY1.DE', 'VOW3.DE', 'VNA.DE', 'ZAL.DE'
+    ]
+
+    # MDAX stocks (Mid-cap German stocks)
+    MDAX_STOCKS = [
+        'AFX.DE', 'BC8.DE', 'COP.DE', 'EVD.DE', 'EVK.DE', 'FIE.DE', 'FME.DE', 'FPE.DE',
+        'FRA.DE', 'G1A.DE', 'GXI.DE', 'HNR1.DE', 'HOT.DE', 'JUN3.DE', 'KGX.DE', 'LEG.DE',
+        'NDA.DE', 'O2D.DE', 'OSR.DE', 'PFV.DE', 'PSM.DE', 'RAA.DE', 'RHK.DE', 'SAX.DE',
+        'SDF.DE', 'SHL.DE', 'SIX2.DE', 'SRT.DE', 'TKA.DE', 'TLX.DE'
     ]
 
     @classmethod
@@ -59,8 +70,13 @@ class ScreenerService:
         """Get list of stocks based on market"""
         if market == 'DAX':
             return cls.DAX_STOCKS
+        elif market == 'MDAX':
+            return cls.MDAX_STOCKS
+        elif market == 'GERMANY':
+            # All German stocks
+            return cls.DAX_STOCKS + cls.MDAX_STOCKS
         elif market == 'ALL':
-            return cls.US_STOCKS + cls.DAX_STOCKS
+            return cls.US_STOCKS + cls.DAX_STOCKS + cls.MDAX_STOCKS
         else:  # Default to USA
             return cls.US_STOCKS
 
@@ -307,6 +323,35 @@ class ScreenerService:
                     'max_market_cap': 2000000000,
                     'min_revenue_growth': 0.1,
                     'prefer_growth': True
+                }
+            },
+            {
+                'name': 'DAX Value',
+                'description': 'Undervalued German DAX stocks',
+                'criteria': {
+                    'market': 'DAX',
+                    'max_pe_ratio': 15,
+                    'min_market_cap': 5000000000,
+                    'prefer_value': True
+                }
+            },
+            {
+                'name': 'German Dividends',
+                'description': 'High dividend German stocks (DAX & MDAX)',
+                'criteria': {
+                    'market': 'GERMANY',
+                    'min_dividend_yield': 0.03,
+                    'prefer_dividends': True,
+                    'min_market_cap': 1000000000
+                }
+            },
+            {
+                'name': 'MDAX Growth',
+                'description': 'Growth stocks from German mid-cap index',
+                'criteria': {
+                    'market': 'MDAX',
+                    'prefer_growth': True,
+                    'min_market_cap': 500000000
                 }
             }
         ]

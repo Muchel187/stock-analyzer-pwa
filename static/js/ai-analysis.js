@@ -103,6 +103,9 @@ class AIAnalysisVisualizer {
                 <!-- Short Squeeze Indicator -->
                 ${this.generateShortSqueezeIndicator(data)}
 
+                <!-- Squeeze Price Scenarios -->
+                ${this.generateSqueezeScenariosCard(data)}
+
                 <!-- Technical Indicators Summary -->
                 <div class="ai-card">
                     <h4>📉 Technische Indikatoren</h4>
@@ -726,6 +729,89 @@ class AIAnalysisVisualizer {
                 <div class="error-icon">⚠️</div>
                 <h3>KI-Analyse nicht verfügbar</h3>
                 <p>Die KI-Analyse konnte nicht durchgeführt werden. Bitte überprüfen Sie Ihre API-Konfiguration.</p>
+            </div>
+        `;
+    }
+
+    /**
+     * Generate Squeeze Price Scenarios Card
+     */
+    generateSqueezeScenariosCard(data) {
+        // Check for squeeze analysis data
+        if (!data.squeeze_analysis || !data.squeeze_analysis.price_scenarios) {
+            return '';
+        }
+
+        const squeezeData = data.squeeze_analysis;
+        const scenarios = squeezeData.price_scenarios.scenarios;
+        const currentPrice = squeezeData.price_scenarios.current_price;
+        const warning = squeezeData.price_scenarios.warning;
+
+        if (!scenarios || scenarios.length === 0) {
+            return '';
+        }
+
+        return `
+            <div class="ai-card squeeze-scenarios-card">
+                <h4>🎯 Short Squeeze Kursziel-Szenarien</h4>
+
+                <div class="squeeze-warning">
+                    ${warning}
+                </div>
+
+                <div class="current-price-display">
+                    <span class="label">Aktueller Kurs:</span>
+                    <span class="price">$${currentPrice.toFixed(2)}</span>
+                </div>
+
+                <div class="scenarios-grid">
+                    ${scenarios.map((scenario, index) => `
+                        <div class="scenario-card ${index === 0 ? 'conservative' : index === 1 ? 'base' : 'aggressive'}">
+                            <div class="scenario-header">
+                                <span class="scenario-name">${scenario.name}</span>
+                                <span class="scenario-probability">${scenario.probability}</span>
+                            </div>
+
+                            <div class="scenario-target">
+                                <div class="target-price">$${scenario.target_price.toFixed(2)}</div>
+                                <div class="target-upside ${scenario.upside_percent > 0 ? 'positive' : 'negative'}">
+                                    ${scenario.upside_percent > 0 ? '+' : ''}${scenario.upside_percent.toFixed(1)}%
+                                </div>
+                            </div>
+
+                            <div class="scenario-timeframe">
+                                <i class="clock-icon">⏰</i> ${scenario.timeframe}
+                            </div>
+
+                            <div class="scenario-description">
+                                ${scenario.description}
+                            </div>
+
+                            <div class="scenario-triggers">
+                                <div class="triggers-label">Auslöser:</div>
+                                <ul>
+                                    ${scenario.triggers.map(trigger => `<li>${trigger}</li>`).join('')}
+                                </ul>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <div class="squeeze-score-summary">
+                    <div class="score-label">Squeeze Score:</div>
+                    <div class="score-bar">
+                        <div class="score-fill" style="width: ${squeezeData.score}%">
+                            ${squeezeData.score}/100
+                        </div>
+                    </div>
+                    <div class="score-level ${squeezeData.level.toLowerCase()}">
+                        ${squeezeData.level} - ${squeezeData.description}
+                    </div>
+                </div>
+
+                <div class="methodology-note">
+                    <i>ℹ️ ${squeezeData.price_scenarios.methodology}</i>
+                </div>
             </div>
         `;
     }
