@@ -1,7 +1,7 @@
 import pytest
 from app import create_app, db
 from app.models import User, Portfolio, Transaction
-from datetime import datetime
+from datetime import datetime, timezone
 
 @pytest.fixture
 def app():
@@ -44,7 +44,7 @@ def auth_headers(client):
 
 @pytest.fixture
 def sample_user(app):
-    """Create a sample user"""
+    """Create a sample user and return user_id"""
     with app.app_context():
         user = User(
             email='sample@example.com',
@@ -53,16 +53,31 @@ def sample_user(app):
         user.set_password('samplepass123')
         db.session.add(user)
         db.session.commit()
-        return user
+        user_id = user.id  # Store ID
+
+    # Return user_id, not the user object
+    # Tests should use this ID directly
+    class UserFixture:
+        def __init__(self, user_id):
+            self._id = user_id
+
+        @property
+        def id(self):
+            return self._id
+
+    return UserFixture(user_id)
 
 @pytest.fixture
 def sample_portfolio(app, sample_user):
-    """Create sample portfolio data"""
+    """Create sample portfolio data and return user_id"""
     with app.app_context():
+        # Get user_id within app context
+        user_id = sample_user.id
+
         # Add portfolio items
         portfolio_items = [
             Portfolio(
-                user_id=sample_user.id,
+                user_id=user_id,
                 ticker='AAPL',
                 shares=10,
                 avg_price=150.00,
@@ -72,7 +87,7 @@ def sample_portfolio(app, sample_user):
                 market='USA'
             ),
             Portfolio(
-                user_id=sample_user.id,
+                user_id=user_id,
                 ticker='MSFT',
                 shares=5,
                 avg_price=300.00,
@@ -89,22 +104,22 @@ def sample_portfolio(app, sample_user):
         # Add transactions
         transactions = [
             Transaction(
-                user_id=sample_user.id,
+                user_id=user_id,
                 ticker='AAPL',
                 transaction_type='BUY',
                 shares=10,
                 price=150.00,
                 total_amount=1500.00,
-                transaction_date=datetime.utcnow()
+                transaction_date=datetime.now(timezone.utc)
             ),
             Transaction(
-                user_id=sample_user.id,
+                user_id=user_id,
                 ticker='MSFT',
                 transaction_type='BUY',
                 shares=5,
                 price=300.00,
                 total_amount=1500.00,
-                transaction_date=datetime.utcnow()
+                transaction_date=datetime.now(timezone.utc)
             )
         ]
 
@@ -114,7 +129,9 @@ def sample_portfolio(app, sample_user):
 
         db.session.commit()
 
+        # Return user_id instead of objects
         return {
-            'items': portfolio_items,
-            'transactions': transactions
+            'user_id': user_id,
+            'item_count': len(portfolio_items),
+            'transaction_count': len(transactions)
         }

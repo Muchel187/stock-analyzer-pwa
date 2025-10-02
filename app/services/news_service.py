@@ -3,7 +3,7 @@ News Service for fetching and analyzing stock news
 """
 import os
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any
 import logging
 
@@ -54,7 +54,7 @@ class NewsService:
                 'news_count': len(news),
                 'categories': categorized,
                 'ticker': ticker.upper(),
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': datetime.now(timezone.utc).isoformat()
             }
             
         except Exception as e:
@@ -292,7 +292,7 @@ class NewsService:
                 return {
                     'news': formatted,
                     'news_count': len(formatted),
-                    'timestamp': datetime.utcnow().isoformat()
+                    'timestamp': datetime.now(timezone.utc).isoformat()
                 }
             
             return None

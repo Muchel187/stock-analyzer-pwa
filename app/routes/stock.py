@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.services import StockService, AIService
 from app.services.news_service import NewsService
-from datetime import datetime
+from datetime import datetime, timezone
 
 bp = Blueprint('stock', __name__, url_prefix='/api/stock')
 
@@ -27,7 +27,7 @@ def get_stock_info(ticker):
             'info': stock_info,
             'technical_indicators': technical,
             'fundamental_analysis': fundamental,
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': datetime.now(timezone.utc).isoformat()
         }), 200
 
     except Exception as e:
@@ -77,7 +77,7 @@ def analyze_with_ai_get(ticker):
         if not ai_analysis:
             return jsonify({'error': 'AI analysis failed'}), 500
 
-        ai_analysis['timestamp'] = datetime.utcnow().isoformat()
+        ai_analysis['timestamp'] = datetime.now(timezone.utc).isoformat()
 
         return jsonify(ai_analysis), 200
 
@@ -114,7 +114,7 @@ def analyze_with_ai():
         if not ai_analysis:
             return jsonify({'error': 'AI analysis failed'}), 500
 
-        ai_analysis['timestamp'] = datetime.utcnow().isoformat()
+        ai_analysis['timestamp'] = datetime.now(timezone.utc).isoformat()
 
         return jsonify(ai_analysis), 200
 
@@ -151,7 +151,7 @@ def get_batch_quotes():
 
         return jsonify({
             'quotes': results,
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': datetime.now(timezone.utc).isoformat()
         }), 200
 
     except Exception as e:
@@ -232,7 +232,7 @@ def get_recommendations():
                 'growth_picks': growth_stocks[:3],
                 'dividend_picks': dividend_stocks[:3]
             },
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': datetime.now(timezone.utc).isoformat()
         }), 200
 
     except Exception as e:
@@ -343,7 +343,7 @@ def get_ai_recommendations():
             'top_buys': buy_recs,
             'top_sells': sell_recs,
             'analyzed_count': len(recommendations),
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': datetime.now(timezone.utc).isoformat()
         }), 200
 
     except Exception as e:
@@ -438,7 +438,7 @@ def compare_stocks():
             'comparison': comparison_data,
             'price_histories': price_histories,
             'period': period,
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': datetime.now(timezone.utc).isoformat()
         }), 200
 
     except Exception as e:

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from app import db
 from sqlalchemy import func
 
@@ -35,7 +35,7 @@ class Portfolio(db.Model):
             self.gain_loss_percent = (self.gain_loss / self.total_invested) * 100
         else:
             self.gain_loss_percent = 0
-        self.last_updated = datetime.utcnow()
+        self.last_updated = datetime.now(timezone.utc)
 
     def to_dict(self):
         """Convert portfolio item to dictionary"""
@@ -78,7 +78,7 @@ class Transaction(db.Model):
     def calculate_amounts(self):
         """Calculate transaction amounts"""
         self.total_amount = self.shares * self.price
-        self.net_amount = self.total_amount + self.fees + self.tax
+        self.net_amount = self.total_amount + (self.fees or 0) + (self.tax or 0)
 
     def to_dict(self):
         """Convert transaction to dictionary"""

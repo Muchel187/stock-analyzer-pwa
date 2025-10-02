@@ -80,7 +80,7 @@ class AlertService:
     def _send_alert_notification(alert: Alert) -> None:
         """Send notification for triggered alert"""
         try:
-            user = User.query.get(alert.user_id)
+            user = db.session.get(User, alert.user_id)
             if not user:
                 return
 

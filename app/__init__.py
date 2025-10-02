@@ -60,7 +60,7 @@ def create_app(config_name='default'):
         from app.models import User
         try:
             uid = int(user_id) if isinstance(user_id, str) else user_id
-            return User.query.get(uid)
+            return db.session.get(User, uid)
         except (ValueError, TypeError):
             return None
 
@@ -71,7 +71,7 @@ def create_app(config_name='default'):
         identity = jwt_data["sub"]
         try:
             uid = int(identity) if isinstance(identity, str) else identity
-            return User.query.get(uid)
+            return db.session.get(User, uid)
         except (ValueError, TypeError):
             return None
 

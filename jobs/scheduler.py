@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 from app.services import AlertService, PortfolioService
 from app.models import Portfolio, Watchlist
@@ -57,7 +57,7 @@ def cleanup_old_cache():
         from app.models import StockCache
 
         expired = StockCache.query.filter(
-            StockCache.expires_at < datetime.utcnow()
+            StockCache.expires_at < datetime.now(timezone.utc)
         ).all()
 
         for cache_entry in expired:

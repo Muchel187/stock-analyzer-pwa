@@ -1,5 +1,5 @@
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import func
 from app import db
 from app.models import Portfolio, Transaction, User
@@ -22,7 +22,7 @@ class PortfolioService:
                 transaction_type=transaction_data['transaction_type'],
                 shares=float(transaction_data['shares']),
                 price=float(transaction_data['price']),
-                transaction_date=transaction_data.get('transaction_date', datetime.utcnow()),
+                transaction_date=transaction_data.get('transaction_date', datetime.now(timezone.utc)),
                 notes=transaction_data.get('notes', ''),
                 fees=float(transaction_data.get('fees', 0)),
                 tax=float(transaction_data.get('tax', 0))

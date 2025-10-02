@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from app import db
 
 class Watchlist(db.Model):
@@ -38,7 +38,7 @@ class Watchlist(db.Model):
         if self.added_price:
             self.price_change = current_price - self.added_price
             self.price_change_percent = (self.price_change / self.added_price) * 100
-        self.last_updated = datetime.utcnow()
+        self.last_updated = datetime.now(timezone.utc)
 
     def to_dict(self):
         """Convert watchlist item to dictionary"""

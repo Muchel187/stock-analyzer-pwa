@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from app import db
 
 class Alert(db.Model):
@@ -32,7 +32,7 @@ class Alert(db.Model):
             return False
 
         self.current_value = current_price
-        self.last_checked = datetime.utcnow()
+        self.last_checked = datetime.now(timezone.utc)
 
         triggered = False
         if self.alert_type == 'PRICE_ABOVE':
@@ -45,7 +45,7 @@ class Alert(db.Model):
 
         if triggered:
             self.is_triggered = True
-            self.triggered_at = datetime.utcnow()
+            self.triggered_at = datetime.now(timezone.utc)
             return True
 
         return False

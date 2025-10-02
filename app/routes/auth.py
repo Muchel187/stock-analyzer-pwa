@@ -117,7 +117,7 @@ def get_profile():
     """Get user profile"""
     try:
         current_user_id = get_jwt_identity()
-        user = User.query.get(current_user_id)
+        user = db.session.get(User, int(current_user_id))
 
         if not user:
             return jsonify({'error': 'User not found'}), 404
@@ -135,7 +135,7 @@ def update_profile():
     """Update user profile"""
     try:
         current_user_id = get_jwt_identity()
-        user = User.query.get(current_user_id)
+        user = db.session.get(User, int(current_user_id))
 
         if not user:
             return jsonify({'error': 'User not found'}), 404
@@ -186,7 +186,7 @@ def change_password():
     """Change user password"""
     try:
         current_user_id = get_jwt_identity()
-        user = User.query.get(current_user_id)
+        user = db.session.get(User, int(current_user_id))
 
         if not user:
             return jsonify({'error': 'User not found'}), 404
