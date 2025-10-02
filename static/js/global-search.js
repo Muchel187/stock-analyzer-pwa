@@ -78,10 +78,11 @@ class GlobalSearch {
             this.showRecentSearches();
             return;
         }
-        
+
         try {
             // Use existing search endpoint
-            const results = await api.searchStocks(query);
+            const response = await api.searchStocks(query);
+            const results = response.results || [];
             this.showResults(results, query);
         } catch (error) {
             console.error('Search error:', error);
@@ -100,16 +101,16 @@ class GlobalSearch {
             this.dropdown.style.display = 'block';
             return;
         }
-        
+
         this.dropdown.innerHTML = results.slice(0, 8).map(stock => `
-            <div class="search-result-item" onclick="globalSearch.selectTicker('${stock.symbol}')">
+            <div class="search-result-item" onclick="globalSearch.selectTicker('${stock.ticker}')">
                 <div class="search-result-main">
-                    <div class="search-result-ticker">${stock.symbol}</div>
-                    <div class="search-result-name">${stock.name || stock.description || ''}</div>
+                    <div class="search-result-ticker">${stock.ticker}</div>
+                    <div class="search-result-name">${stock.company_name || stock.name || ''}</div>
                 </div>
             </div>
         `).join('');
-        
+
         this.dropdown.style.display = 'block';
     }
     
