@@ -16,9 +16,9 @@ class AIService:
 
         if self.google_api_key:
             self.provider = 'google'
-            # Using gemini-pro-latest which is Gemini 2.5 Pro for deepest analysis
-            self.api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-latest:generateContent?key={self.google_api_key}"
-            logger.info("Using Google Gemini Pro (2.5 Pro) for stock analysis")
+            # Using Gemini 2.5 Pro (October 2025 - latest stable version)
+            self.api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={self.google_api_key}"
+            logger.info("Using Google Gemini 2.5 Pro for stock analysis")
         elif self.openai_api_key:
             self.provider = 'openai'
             self.api_url = "https://api.openai.com/v1/chat/completions"
@@ -94,7 +94,7 @@ class AIService:
                 }
             }
 
-            response = requests.post(self.api_url, json=payload, timeout=60)
+            response = requests.post(self.api_url, json=payload, timeout=90)
 
             if response.status_code == 200:
                 result = response.json()
@@ -168,130 +168,77 @@ class AIService:
                                 fundamental_analysis: Dict[str, Any] = None,
                                 short_data: Dict[str, Any] = None,
                                 news_sentiment: Dict[str, Any] = None) -> str:
-        """Create a comprehensive prompt for AI analysis with enhanced data"""
-        prompt = f"""
-Analyze the following stock data for {stock_data.get('ticker', 'Unknown')} ({stock_data.get('company_name', 'Unknown Company')}):
-
-## Current Market Data:
-- Current Price: ${stock_data.get('current_price', 'N/A')}
-- Market Cap: ${stock_data.get('market_cap', 'N/A'):,} if stock_data.get('market_cap') else 'N/A'
-- P/E Ratio: {stock_data.get('pe_ratio', 'N/A')}
-- Dividend Yield: {stock_data.get('dividend_yield', 'N/A')}
-- 52-Week Range: ${stock_data.get('52_week_low', 'N/A')} - ${stock_data.get('52_week_high', 'N/A')}
-- Beta: {stock_data.get('beta', 'N/A')}
-"""
-
+        """Create an optimized, compact prompt for AI analysis"""
+        ticker = stock_data.get('ticker', 'N/A')
+        company = stock_data.get('company_name', 'Unknown')
+        
+        # Build compact data sections
+        sections = []
+        
+        # Market data (compact)
+        market = f"Price ${stock_data.get('current_price', 'N/A')}, "
+        market += f"P/E {stock_data.get('pe_ratio', 'N/A')}, "
+        market += f"Beta {stock_data.get('beta', 'N/A')}"
+        sections.append(f"Market: {market}")
+        
+        # Technical (compact)
         if technical_indicators:
-            prompt += f"""
-## Technical Indicators:
-- RSI: {technical_indicators.get('rsi', 'N/A')}
-- MACD: {technical_indicators.get('macd', {}).get('macd', 'N/A')}
-- Price Change (1 Month): {technical_indicators.get('price_change_1m', 'N/A')}%
-- Volatility: {technical_indicators.get('volatility', 'N/A')}
-- Volume Trend: {technical_indicators.get('volume_trend', 'N/A')}
-"""
-
+            tech = f"RSI {technical_indicators.get('rsi', 'N/A')}, "
+            tech += f"MACD {technical_indicators.get('macd', {}).get('macd', 'N/A')}, "
+            tech += f"1M Change {technical_indicators.get('price_change_1m', 'N/A')}%"
+            sections.append(f"Technical: {tech}")
+        
+        # Fundamental (compact)
         if fundamental_analysis:
-            prompt += f"""
-## Fundamental Scores:
-- Overall Score: {fundamental_analysis.get('overall_score', 'N/A')}/100
-- Value Score: {fundamental_analysis.get('scores', {}).get('value_score', 'N/A')}/100
-- Financial Health: {fundamental_analysis.get('scores', {}).get('financial_health_score', 'N/A')}/100
-- Profitability: {fundamental_analysis.get('scores', {}).get('profitability_score', 'N/A')}/100
-- Current Recommendation: {fundamental_analysis.get('recommendation', 'N/A')}
-"""
-
-        # NEW: Analyst Consensus
+            fund = f"Score {fundamental_analysis.get('overall_score', 'N/A')}/100, "
+            fund += f"Rec: {fundamental_analysis.get('recommendation', 'N/A')}"
+            sections.append(f"Fundamental: {fund}")
+        
+        # Analyst consensus (compact)
         if stock_data.get('analyst_ratings'):
             ratings = stock_data['analyst_ratings']
             total = ratings['total_analysts']
             if total > 0:
-                prompt += f"""
-## Analyst Consensus ({ratings['period']}):
-- Total Analysts: {total}
-- Strong Buy: {ratings['strong_buy']} ({ratings['strong_buy']/total*100:.1f}%)
-- Buy: {ratings['buy']} ({ratings['buy']/total*100:.1f}%)
-- Hold: {ratings['hold']} ({ratings['hold']/total*100:.1f}%)
-- Sell: {ratings['sell']} ({ratings['sell']/total*100:.1f}%)
-- Strong Sell: {ratings['strong_sell']} ({ratings['strong_sell']/total*100:.1f}%)
-"""
-
-        if stock_data.get('price_target'):
+                buy_pct = (ratings['strong_buy'] + ratings['buy']) / total * 100
+                sections.append(f"Analysts: {total} total, {buy_pct:.0f}% Buy/Strong Buy")
+        
+        if stock_data.get('price_target') and stock_data['price_target'].get('target_mean'):
             target = stock_data['price_target']
-            if target['target_mean']:
-                prompt += f"""
-- Average Price Target: ${target['target_mean']:.2f}
-- Target Range: ${target['target_low']:.2f} - ${target['target_high']:.2f}
-- Number of Estimates: {target['number_analysts']}
-
-**ANALYST COMPARISON TASK**: Compare your analysis with the analyst consensus. If your recommendation differs significantly, explain why. Are the analysts missing something, or is there information they have that supports their view?
-"""
-
-        # NEW: Insider Activity
+            sections.append(f"Analyst Target: ${target['target_mean']:.2f} (Range ${target['target_low']:.2f}-${target['target_high']:.2f})")
+        
+        # Insider activity (compact)
         if stock_data.get('insider_transactions'):
             insider = stock_data['insider_transactions']
-            signal_emoji = "🟢" if insider['signal'] == 'bullish' else "🔴" if insider['signal'] == 'bearish' else "⚪"
-            prompt += f"""
-## Insider Transactions (Last {insider['period_days']} days):
-{signal_emoji} Signal: {insider['signal'].upper()}
-- Shares Bought: {insider['shares_bought']:,}
-- Shares Sold: {insider['shares_sold']:,}
-- Net Position: {insider['net_shares']:,} shares
-- Net Value: ${insider['net_value']:,.0f}
-- Total Transactions: {insider['transaction_count']}
-
-**INSIDER ACTIVITY TASK**: Interpret this insider activity. Does management show confidence in the company by buying shares, or are they selling? This can be a strong signal about the company's near-term prospects. Consider whether insiders might have information not yet public.
-"""
-
-        # NEW: News Sentiment
+            signal = insider['signal']
+            sections.append(f"Insiders: {signal.upper()}, Net ${insider['net_value']:,.0f} ({insider['net_shares']:,} shares)")
+        
+        # News sentiment (compact)
         if news_sentiment and news_sentiment.get('article_count', 0) > 0:
             sent = news_sentiment
-            sentiment_emoji = "🟢" if sent['overall_score'] > 0.2 else "🔴" if sent['overall_score'] < -0.2 else "⚪"
-            prompt += f"""
-## Recent News Sentiment (Last {sent['period_days']} days):
-{sentiment_emoji} Overall Score: {sent['overall_score']:.2f} (-1 to +1 scale)
-- Bullish Articles: {sent['sentiment_percentages']['bullish_pct']}% ({sent['sentiment_distribution']['bullish']} articles)
-- Neutral Articles: {sent['sentiment_percentages']['neutral_pct']}% ({sent['sentiment_distribution']['neutral']} articles)
-- Bearish Articles: {sent['sentiment_percentages']['bearish_pct']}% ({sent['sentiment_distribution']['bearish']} articles)
-- Total Articles Analyzed: {sent['article_count']}
-
-**NEWS SENTIMENT TASK**: Consider this news sentiment in your short-term outlook (1-3 months). A highly positive sentiment can drive near-term momentum and FOMO buying, while negative sentiment may create buying opportunities or signal emerging risks. Assess whether the sentiment is justified by fundamentals or driven by hype.
-"""
-
-        prompt += """
-Please provide a comprehensive analysis covering:
-1. Technical Analysis insights
-2. Fundamental Analysis evaluation
-3. Key Risks to consider
-4. Growth Opportunities
-5. Price Target - Provide a 12-month price target with justification based on valuation metrics, growth prospects, and market conditions
-"""
-
-        # Add short data section if available
+            sections.append(f"News: {sent['overall_score']:.2f} score, {sent['sentiment_percentages']['bullish_pct']}% bullish")
+        
+        # Short data (compact)
         if short_data:
-            prompt += f"""
-## SHORT INTEREST DATA (from ChartExchange.com):
-- Short Interest: {short_data.get('short_interest', 'N/A')} shares
-- Short % of Float: {short_data.get('short_percent_of_float', 'N/A')}%
-- Days to Cover: {short_data.get('days_to_cover', 'N/A')}
-- Failure to Deliver: {short_data.get('failure_to_deliver', 'N/A')} shares
-- Last Updated: {short_data.get('last_updated', 'N/A')}
-"""
+            short_info = f"Short Interest: {short_data.get('short_percent_of_float', 'N/A')}% float, "
+            short_info += f"DTC {short_data.get('days_to_cover', 'N/A')}"
+            sections.append(f"Short Data: {short_info}")
+        
+        # Build final compact prompt
+        prompt = f"""Analyze {ticker} ({company}):
 
-        prompt += """
-6. Short Squeeze Potential - Analyze the likelihood of a short squeeze based on:
-   - Actual short interest data from ChartExchange (if available above)
-   - Short interest as percentage of float (if high >20% = potential)
-   - Days to cover ratio (if high >5 days = potential)
-   - Failure to deliver data indicates naked shorting pressure
-   - Recent price momentum and volume spikes
-   - Gamma squeeze potential from options activity
-   - Social media sentiment and retail interest
-   Rate the short squeeze risk from 0-100 (0=no risk, 100=extreme risk) and provide specific reasoning with concrete data points
-7. Final Investment Recommendation (BUY/HOLD/SELL) with clear reasoning
+DATA:
+{chr(10).join(['- ' + s for s in sections])}
 
-Format your response with clear section headings.
-"""
+PROVIDE (be concise):
+1. Technical Analysis: Trend, momentum, entry points
+2. Fundamental Analysis: Valuation, growth, quality
+3. Key Risks: Top 3 concerns
+4. Opportunities: Growth catalysts
+5. Price Target: 12-month target with justification
+6. Short Squeeze Potential: Rate 0-100 based on data, explain
+7. Recommendation: BUY/HOLD/SELL with reasoning
+
+Compare your view with analyst consensus. Consider insider activity and news sentiment in outlook."""
 
         return prompt
 
