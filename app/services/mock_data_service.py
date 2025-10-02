@@ -411,7 +411,7 @@ Basierend auf der umfassenden Analyse empfehlen wir {recommendation.upper()}. Di
 
 ---
 *Hinweis: Dies sind Mock-Daten für Demonstrationszwecke während API-Ausfällen. Echte Gemini AI-Analysen sind bei verfügbarem API-Kontingent deutlich detaillierter.*
-            """,
+""",
             'recommendation': recommendation,
             'confidence_score': round(random.uniform(65, 90), 1),
             'price_target': price_target,

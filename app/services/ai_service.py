@@ -281,14 +281,25 @@ Base the data on realistic price movements for this stock. Use your knowledge of
         try:
             prompt = self._create_analysis_prompt(stock_data, technical_indicators, fundamental_analysis, short_data, news_sentiment)
 
+            # Try primary provider (Gemini or OpenAI based on configured keys)
             if self.provider == 'google':
                 analysis_text = self._call_google_gemini(prompt)
+
+                # If Gemini fails and OpenAI is available, try OpenAI as fallback
+                if not analysis_text and self.openai_api_key:
+                    logger.warning(f"Gemini failed for {ticker}, trying OpenAI fallback")
+                    analysis_text = self._call_openai(prompt)
+                    if analysis_text:
+                        # Temporarily switch provider info for this response
+                        self.provider = 'openai'
+                        self.provider_name = 'OpenAI GPT-4 (Fallback)'
+
             else:  # openai
                 analysis_text = self._call_openai(prompt)
 
-            # If AI call fails, use mock data
+            # If all AI calls fail, use mock data
             if not analysis_text:
-                logger.warning(f"AI service failed for {ticker}, using mock analysis")
+                logger.warning(f"All AI services failed for {ticker}, using mock analysis")
                 from app.services.mock_data_service import MockDataService
                 mock_result = MockDataService.get_mock_ai_analysis(ticker, stock_data)
                 return mock_result

@@ -4,10 +4,14 @@ Alternative data sources for stock information when Yahoo Finance is unavailable
 import requests
 import os
 import logging
+import time
 from typing import Dict, Optional, Any, Tuple
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+# Rate limiting configuration
+RATE_LIMIT_DELAY = 1.5  # Seconds between API calls to prevent "too many requests"
 
 
 # German Stock Ticker Mapping for Finnhub
@@ -132,6 +136,9 @@ class AlphaVantageService:
             response.raise_for_status()
             data = response.json()
 
+            # Rate limiting delay
+            time.sleep(RATE_LIMIT_DELAY)
+
             if 'Time Series (Daily)' not in data:
                 logger.warning(f"No time series data from Alpha Vantage for {ticker}")
                 if 'Note' in data:
@@ -182,6 +189,9 @@ class AlphaVantageService:
             response.raise_for_status()
             data = response.json()
 
+            # Rate limiting delay
+            time.sleep(RATE_LIMIT_DELAY)
+
             if 'Global Quote' not in data or not data['Global Quote']:
                 logger.warning(f"No data returned from Alpha Vantage for {ticker}")
                 return None
@@ -223,6 +233,9 @@ class AlphaVantageService:
             response = requests.get(AlphaVantageService.BASE_URL, params=params, timeout=10)
             response.raise_for_status()
             data = response.json()
+
+            # Rate limiting delay
+            time.sleep(RATE_LIMIT_DELAY)
 
             if not data or 'Symbol' not in data:
                 return None
@@ -279,6 +292,9 @@ class FinnhubService:
             response.raise_for_status()
             data = response.json()
 
+            # Rate limiting delay to prevent "too many requests"
+            time.sleep(RATE_LIMIT_DELAY)
+
             if not data or data.get('c') == 0:
                 logger.warning(f"No data returned from Finnhub for {ticker} (API ticker: {api_ticker})")
                 return None
@@ -317,6 +333,9 @@ class FinnhubService:
             response = requests.get(f"{FinnhubService.BASE_URL}/stock/profile2", params=params, timeout=10)
             response.raise_for_status()
             data = response.json()
+
+            # Rate limiting delay
+            time.sleep(RATE_LIMIT_DELAY)
 
             if not data or not data.get('name'):
                 return None
@@ -363,6 +382,9 @@ class TwelveDataService:
             response = requests.get(f"{TwelveDataService.BASE_URL}/time_series", params=params, timeout=10)
             response.raise_for_status()
             data = response.json()
+
+            # Rate limiting delay
+            time.sleep(RATE_LIMIT_DELAY)
 
             if 'values' not in data or not data['values']:
                 return None
