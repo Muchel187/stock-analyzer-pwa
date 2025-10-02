@@ -8,6 +8,11 @@ def index():
     """Serve the main application"""
     return render_template('index.html')
 
+@bp.route('/admin')
+def admin():
+    """Serve the admin dashboard"""
+    return render_template('admin.html')
+
 @bp.route('/health')
 @bp.route('/api/health')
 def health_check():

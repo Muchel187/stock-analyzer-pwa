@@ -291,6 +291,71 @@ class APIService {
     async searchStocks(query) {
         return await this.request(`/stock/search?q=${encodeURIComponent(query)}`);
     }
+
+    // ========== Admin API Methods ==========
+
+    /**
+     * Check if current user is admin
+     */
+    async checkAdmin() {
+        return await this.request('/admin/check');
+    }
+
+    /**
+     * Get system statistics
+     */
+    async getAdminStats() {
+        return await this.request('/admin/stats');
+    }
+
+    /**
+     * Get users list with pagination
+     */
+    async getAdminUsers(params = {}) {
+        const queryParams = new URLSearchParams();
+        if (params.page) queryParams.append('page', params.page);
+        if (params.per_page) queryParams.append('per_page', params.per_page);
+        if (params.search) queryParams.append('search', params.search);
+        if (params.is_admin !== undefined) queryParams.append('is_admin', params.is_admin);
+
+        const query = queryParams.toString();
+        return await this.request(`/admin/users${query ? '?' + query : ''}`);
+    }
+
+    /**
+     * Get detailed user information
+     */
+    async getAdminUserDetails(userId) {
+        return await this.request(`/admin/users/${userId}`);
+    }
+
+    /**
+     * Update user information
+     */
+    async updateAdminUser(userId, data) {
+        return await this.request(`/admin/users/${userId}`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
+    }
+
+    /**
+     * Delete user account
+     */
+    async deleteAdminUser(userId) {
+        return await this.request(`/admin/users/${userId}`, {
+            method: 'DELETE'
+        });
+    }
+
+    /**
+     * Toggle user's admin status
+     */
+    async toggleAdminStatus(userId) {
+        return await this.request(`/admin/users/${userId}/toggle-admin`, {
+            method: 'POST'
+        });
+    }
 }
 
 // Create global API instance

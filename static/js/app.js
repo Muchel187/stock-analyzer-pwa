@@ -151,24 +151,55 @@ class StockAnalyzerApp {
             userDisplay.style.display = 'flex';
             loginBtn.style.display = 'none';
             username.textContent = this.currentUser.username;
-            
+
             // Show notification bell when logged in
             if (navNotifications) {
                 navNotifications.style.display = 'block';
             }
-            
+
             // Initialize notification center
             if (typeof NotificationCenter !== 'undefined' && !window.notificationCenter) {
                 window.notificationCenter = new NotificationCenter(this);
             }
+
+            // Add admin link to menu if user is admin
+            this.updateAdminLink();
         } else {
             userDisplay.style.display = 'none';
             loginBtn.style.display = 'block';
-            
+
             // Hide notification bell when logged out
             if (navNotifications) {
                 navNotifications.style.display = 'none';
             }
+
+            // Remove admin link
+            this.removeAdminLink();
+        }
+    }
+
+    updateAdminLink() {
+        // Check if user is admin and add link to navbar
+        if (this.currentUser && this.currentUser.is_admin) {
+            const navbarMenu = document.querySelector('.navbar-menu');
+            if (navbarMenu) {
+                // Check if admin link already exists
+                let adminLink = document.querySelector('.navbar-menu .admin-nav-link');
+
+                if (!adminLink) {
+                    // Create admin link
+                    const li = document.createElement('li');
+                    li.innerHTML = '<a href="/admin" class="admin-nav-link">🛡️ Admin</a>';
+                    navbarMenu.appendChild(li);
+                }
+            }
+        }
+    }
+
+    removeAdminLink() {
+        const adminLink = document.querySelector('.navbar-menu .admin-nav-link');
+        if (adminLink && adminLink.parentElement) {
+            adminLink.parentElement.remove();
         }
     }
 

@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Stock Analyzer Pro</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="navbar-container">
+            <a href="/" class="navbar-brand">Stock Analyzer Pro</a>
+            <ul class="navbar-menu">
+                <li><a href="/">Dashboard</a></li>
+                <li><a href="/#portfolio">Portfolio</a></li>
+                <li><a href="/#watchlist">Watchlist</a></li>
+                <li><a href="/#screener">Screener</a></li>
+                <li><a href="/#alerts">Alerts</a></li>
+                <li><a href="/admin" class="admin-link active">Admin</a></li>
+            </ul>
+            <div class="navbar-user">
+                <span id="userDisplay"></span>
+                <button onclick="window.location.href='/'" class="btn btn-secondary">Zurück zum Dashboard</button>
+                <button onclick="adminApp.logout()" class="btn btn-primary">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Admin Dashboard -->
+    <main class="admin-container">
+        <!-- Admin Header -->
+        <div class="admin-header">
+            <h1>Admin Dashboard</h1>
+            <p>Verwalten Sie Benutzer und überwachen Sie Systemmetriken</p>
+        </div>
+
+        <!-- System Statistics -->
+        <div class="admin-stats-grid" id="systemStats">
+            <div class="stat-card">
+                <div class="stat-icon">👥</div>
+                <div class="stat-content">
+                    <h3>Gesamtbenutzer</h3>
+                    <p class="stat-number" id="totalUsers">-</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">⭐</div>
+                <div class="stat-content">
+                    <h3>Aktive heute</h3>
+                    <p class="stat-number" id="activeToday">-</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">📊</div>
+                <div class="stat-content">
+                    <h3>Portfolios</h3>
+                    <p class="stat-number" id="totalPortfolios">-</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🔔</div>
+                <div class="stat-content">
+                    <h3>Alerts</h3>
+                    <p class="stat-number" id="totalAlerts">-</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Users Management -->
+        <div class="admin-section">
+            <div class="section-header">
+                <h2>Benutzerverwaltung</h2>
+                <div class="section-controls">
+                    <input type="text" id="userSearch" placeholder="Benutzer suchen..." class="search-input">
+                    <select id="userFilter" class="filter-select">
+                        <option value="">Alle Benutzer</option>
+                        <option value="admin">Nur Admins</option>
+                        <option value="regular">Nur reguläre Benutzer</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Users Table -->
+            <div class="admin-table-container">
+                <table class="admin-table" id="usersTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Benutzername</th>
+                            <th>Email</th>
+                            <th>Rolle</th>
+                            <th>Registriert</th>
+                            <th>Letzter Login</th>
+                            <th>Portfolios</th>
+                            <th>Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTableBody">
+                        <!-- Users will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination" id="usersPagination">
+                <!-- Pagination controls will be loaded here -->
+            </div>
+        </div>
+    </main>
+
+    <!-- User Details Modal -->
+    <div class="modal" id="userDetailsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Benutzerdetails</h2>
+                <span class="close" onclick="adminApp.closeModal('userDetailsModal')">&times;</span>
+            </div>
+            <div class="modal-body" id="userDetailsContent">
+                <!-- User details will be loaded here -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="adminApp.closeModal('userDetailsModal')">Schließen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit User Modal -->
+    <div class="modal" id="editUserModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Benutzer bearbeiten</h2>
+                <span class="close" onclick="adminApp.closeModal('editUserModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="editUserForm">
+                    <input type="hidden" id="editUserId">
+                    <div class="form-group">
+                        <label for="editUsername">Benutzername</label>
+                        <input type="text" id="editUsername" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editEmail">Email</label>
+                        <input type="email" id="editEmail" class="form-input" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="adminApp.closeModal('editUserModal')">Abbrechen</button>
+                <button class="btn btn-primary" onclick="adminApp.saveUserEdit()">Speichern</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal" id="deleteConfirmModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Benutzer löschen</h2>
+                <span class="close" onclick="adminApp.closeModal('deleteConfirmModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p>Sind Sie sicher, dass Sie diesen Benutzer löschen möchten?</p>
+                <p class="warning-text">Diese Aktion kann nicht rückgängig gemacht werden!</p>
+                <p id="deleteUserInfo"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="adminApp.closeModal('deleteConfirmModal')">Abbrechen</button>
+                <button class="btn btn-danger" onclick="adminApp.confirmDelete()">Löschen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="notification" class="notification"></div>
+
+    <!-- Loading Spinner -->
+    <div id="loadingSpinner" class="loading-spinner">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/admin.js"></script>
+    <script>
+        // Initialize admin app
+        const adminApp = new AdminApp();
+        adminApp.init();
+    </script>
+</body>
+</html>
