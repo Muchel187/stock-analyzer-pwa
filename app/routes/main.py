@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, send_from_directory, current_app, jsonify
+from flask_jwt_extended import jwt_required
 import os
 
 bp = Blueprint('main', __name__)
@@ -50,3 +51,13 @@ def service_worker():
 def offline():
     """Offline page"""
     return render_template('offline.html')
+
+@bp.route('/api/config/ws-key', methods=['GET'])
+@jwt_required()
+def get_ws_key():
+    """Provide the Twelve Data API key to authenticated users for WebSocket connection"""
+    api_key = os.environ.get('TWELVE_DATA_API_KEY')
+    if not api_key:
+        return jsonify({'error': 'WebSocket API key not configured on server'}), 500
+
+    return jsonify({'apiKey': api_key}), 200

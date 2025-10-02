@@ -13,6 +13,7 @@ class StockAnalyzerApp {
         this.priceHistoryData = null;
         this.showSMA50 = false;
         this.showSMA200 = false;
+        this.websocketManager = new WebSocketManager(); // Real-time price updates
         this.init();
     }
 
@@ -141,11 +142,116 @@ class StockAnalyzerApp {
                 const response = await api.getProfile();
                 this.currentUser = response.user;
                 this.updateUserDisplay();
+
+                // Setup WebSocket connection for real-time updates after successful auth
+                await this.setupWebSocket();
             } catch (error) {
                 console.error('Auth check failed:', error);
                 api.clearTokens();
             }
         }
+    }
+
+    /**
+     * Setup WebSocket connection and event listeners for real-time price updates
+     */
+    async setupWebSocket() {
+        try {
+            console.log('[App] Setting up WebSocket connection...');
+
+            // Connect to Twelve Data WebSocket
+            await this.websocketManager.connect();
+
+            // Setup price update callback
+            this.websocketManager.onPriceUpdate = (data) => {
+                console.log('[App] 📊 Real-time price update:', data);
+                this.updatePriceInUI(data.symbol, data.price);
+            };
+
+            // Setup connection status callback
+            this.websocketManager.onConnectionChange = (status) => {
+                console.log(`[App] WebSocket status: ${status}`);
+                if (status === 'connected') {
+                    this.showNotification('Echtzeit-Daten aktiv', 'success');
+                } else if (status === 'error' || status === 'failed') {
+                    this.showNotification('Echtzeit-Verbindung fehlgeschlagen', 'warning');
+                }
+            };
+
+        } catch (error) {
+            console.error('[App] WebSocket setup failed:', error);
+            // Don't show error to user - app still works without WebSocket
+        }
+    }
+
+    /**
+     * Update price displays across the UI with real-time data
+     * @param {string} ticker - Stock ticker symbol
+     * @param {number} price - New price
+     */
+    updatePriceInUI(ticker, price) {
+        const tickerUpper = ticker.toUpperCase();
+        console.log(`[App] Updating UI for ${tickerUpper}: $${price.toFixed(2)}`);
+
+        // 1. Update Watchlist widget on dashboard
+        const watchlistItems = document.querySelectorAll('.watchlist-item');
+        watchlistItems.forEach(item => {
+            const tickerEl = item.querySelector('.watchlist-item-ticker');
+            if (tickerEl && tickerEl.textContent.trim() === tickerUpper) {
+                const priceEl = item.querySelector('.watchlist-item-current');
+                if (priceEl) {
+                    const oldPrice = parseFloat(priceEl.textContent.replace('$', ''));
+                    priceEl.textContent = `$${price.toFixed(2)}`;
+
+                    // Add animation for price change
+                    priceEl.classList.add(price > oldPrice ? 'price-up' : 'price-down');
+                    setTimeout(() => {
+                        priceEl.classList.remove('price-up', 'price-down');
+                    }, 1000);
+                }
+            }
+        });
+
+        // 2. Update Analysis page header (if viewing this stock)
+        if (this.currentAnalysisTicker === tickerUpper) {
+            const priceDisplay = document.getElementById('stockPrice');
+            if (priceDisplay) {
+                const currentPriceEl = priceDisplay.querySelector('.price-current');
+                if (currentPriceEl) {
+                    const oldPrice = parseFloat(currentPriceEl.textContent.replace('$', ''));
+                    currentPriceEl.textContent = `$${price.toFixed(2)}`;
+                    this.currentStockPrice = price;
+
+                    // Add animation
+                    currentPriceEl.classList.add(price > oldPrice ? 'price-up' : 'price-down');
+                    setTimeout(() => {
+                        currentPriceEl.classList.remove('price-up', 'price-down');
+                    }, 1000);
+
+                    // Update change percentage if we have previous close
+                    const changeEl = priceDisplay.querySelector('.price-change-percent');
+                    if (changeEl && oldPrice) {
+                        const changePercent = ((price - oldPrice) / oldPrice * 100).toFixed(2);
+                        const sign = changePercent >= 0 ? '+' : '';
+                        changeEl.textContent = `${sign}${changePercent}%`;
+                        changeEl.className = 'price-change-percent ' + (changePercent >= 0 ? 'positive' : 'negative');
+                    }
+                }
+            }
+        }
+
+        // 3. Update Portfolio values (if this stock is in portfolio)
+        const portfolioItems = document.querySelectorAll('.portfolio-item');
+        portfolioItems.forEach(item => {
+            const tickerEl = item.querySelector('.portfolio-ticker');
+            if (tickerEl && tickerEl.textContent.trim() === tickerUpper) {
+                const priceEl = item.querySelector('.portfolio-current-price');
+                if (priceEl) {
+                    priceEl.textContent = `$${price.toFixed(2)}`;
+                }
+                // Note: Portfolio total value recalculation would happen on next refresh
+            }
+        });
     }
 
     updateUserDisplay() {
@@ -312,6 +418,13 @@ class StockAnalyzerApp {
             const response = await api.getWatchlist();
             this.displayWatchlistItems(response.items.slice(0, 5));
             container.classList.remove('loading');
+
+            // Subscribe to real-time updates for watchlist tickers
+            if (this.websocketManager && response.items.length > 0) {
+                const tickers = response.items.map(item => item.ticker);
+                this.websocketManager.subscribe(tickers);
+                console.log(`[App] Subscribed to real-time updates for watchlist: ${tickers.join(', ')}`);
+            }
         } catch (error) {
             container.classList.remove('loading');
         }
@@ -644,7 +757,7 @@ class StockAnalyzerApp {
         console.log('analyzeStock called');
         const ticker = document.getElementById('stockSearch').value.trim();
         console.log('Ticker:', ticker);
-        
+
         if (!ticker) {
             this.showNotification('Bitte geben Sie ein Symbol ein', 'error');
             return;
@@ -656,7 +769,7 @@ class StockAnalyzerApp {
             this.showNotification('UI Fehler: Result container nicht gefunden', 'error');
             return;
         }
-        
+
         resultDiv.style.display = 'block';
         resultDiv.classList.add('loading');
 
@@ -669,9 +782,24 @@ class StockAnalyzerApp {
 
             console.log('Stock data received:', stockInfo.ticker);
             console.log('AI analysis:', aiAnalysis ? 'Present' : 'Not requested');
-            
+
             resultDiv.classList.remove('loading');
             this.displayStockAnalysis(stockInfo, aiAnalysis);
+
+            // Subscribe to real-time updates for this ticker
+            if (this.websocketManager && stockInfo.ticker) {
+                const tickerUpper = stockInfo.ticker.toUpperCase();
+
+                // Unsubscribe from previous ticker if different
+                if (this.currentAnalysisTicker && this.currentAnalysisTicker !== tickerUpper) {
+                    this.websocketManager.unsubscribe([this.currentAnalysisTicker]);
+                    console.log(`[App] Unsubscribed from ${this.currentAnalysisTicker}`);
+                }
+
+                // Subscribe to new ticker
+                this.websocketManager.subscribe([tickerUpper]);
+                console.log(`[App] Subscribed to real-time updates for ${tickerUpper}`);
+            }
         } catch (error) {
             console.error('analyzeStock error:', error);
             resultDiv.classList.remove('loading');

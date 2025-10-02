@@ -862,9 +862,48 @@ body.dark-theme .modal-content {
     .news-card {
         flex-direction: column;
     }
-    
+
     .news-thumbnail {
         width: 100%;
         height: 150px;
+    }
+}
+
+/* Real-Time Price Update Animations */
+.price-up {
+    animation: priceFlashGreen 1s ease;
+}
+
+.price-down {
+    animation: priceFlashRed 1s ease;
+}
+
+@keyframes priceFlashGreen {
+    0% {
+        background-color: transparent;
+        transform: scale(1);
+    }
+    20% {
+        background-color: rgba(72, 187, 120, 0.3);
+        transform: scale(1.05);
+    }
+    100% {
+        background-color: transparent;
+        transform: scale(1);
+    }
+}
+
+@keyframes priceFlashRed {
+    0% {
+        background-color: transparent;
+        transform: scale(1);
+    }
+    20% {
+        background-color: rgba(245, 101, 101, 0.3);
+        transform: scale(1.05);
+    }
+    100% {
+        background-color: transparent;
+        transform: scale(1);
     }
 }
