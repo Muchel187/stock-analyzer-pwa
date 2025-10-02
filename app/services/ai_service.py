@@ -16,11 +16,10 @@ class AIService:
 
         if self.google_api_key:
             self.provider = 'google'
-            self.provider_name = 'Google Gemini 2.0 Flash Experimental'
-            # Using Gemini 2.0 Flash Experimental (higher rate limits, faster responses)
-            # Flash Experimental has better quota management compared to Pro
-            self.api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key={self.google_api_key}"
-            logger.info("Using Google Gemini 2.0 Flash Experimental for stock analysis")
+            self.provider_name = 'Google Gemini 2.5 Pro'
+            # Using Gemini 2.5 Pro (latest model with enhanced reasoning, Oct 2025)
+            self.api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={self.google_api_key}"
+            logger.info("Using Google Gemini 2.5 Pro for stock analysis")
         elif self.openai_api_key:
             self.provider = 'openai'
             self.provider_name = 'OpenAI GPT-4'
