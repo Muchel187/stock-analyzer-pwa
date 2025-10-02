@@ -16,9 +16,9 @@ class AIService:
 
         if self.google_api_key:
             self.provider = 'google'
-            # Using Gemini 2.5 Pro (October 2025 - latest stable version)
-            self.api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={self.google_api_key}"
-            logger.info("Using Google Gemini 2.5 Pro for stock analysis")
+            # Using Gemini 2.0 Flash Experimental (October 2025 - free tier, state-of-the-art)
+            self.api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key={self.google_api_key}"
+            logger.info("Using Google Gemini 2.0 Flash Experimental for stock analysis")
         elif self.openai_api_key:
             self.provider = 'openai'
             self.api_url = "https://api.openai.com/v1/chat/completions"
@@ -90,7 +90,7 @@ class AIService:
                 }],
                 "generationConfig": {
                     "temperature": 0.3,
-                    "maxOutputTokens": 8192,  # Increased from 2048 for comprehensive analysis
+                    "maxOutputTokens": 16384,  # Increased for comprehensive analysis with all sections
                 }
             }
 
@@ -223,22 +223,70 @@ class AIService:
             short_info += f"DTC {short_data.get('days_to_cover', 'N/A')}"
             sections.append(f"Short Data: {short_info}")
         
-        # Build final compact prompt
-        prompt = f"""Analyze {ticker} ({company}):
+        # Build final comprehensive prompt
+        prompt = f"""Analyze {ticker} ({company}) - Comprehensive Due Diligence Report:
 
 DATA:
 {chr(10).join(['- ' + s for s in sections])}
 
-PROVIDE (be concise):
-1. Technical Analysis: Trend, momentum, entry points
-2. Fundamental Analysis: Valuation, growth, quality
-3. Key Risks: Top 3 concerns
-4. Opportunities: Growth catalysts
-5. Price Target: 12-month target with justification
-6. Short Squeeze Potential: Rate 0-100 based on data, explain
-7. Recommendation: BUY/HOLD/SELL with reasoning
+PROVIDE DETAILED ANALYSIS IN FOLLOWING SECTIONS:
 
-Compare your view with analyst consensus. Consider insider activity and news sentiment in outlook."""
+## 1. TECHNICAL ANALYSIS
+- Current trend direction (bullish/bearish/neutral)
+- Key support and resistance levels
+- RSI interpretation (overbought/oversold?)
+- MACD signals and momentum
+- Optimal entry/exit points
+- Volume analysis
+
+## 2. FUNDAMENTAL ANALYSIS
+- Valuation assessment (undervalued/overvalued?)
+- Growth prospects and catalysts
+- Profitability and margins analysis
+- Balance sheet health
+- Comparison with analyst consensus
+- Quality of management and strategy
+
+## 3. KEY RISKS (HAUPTRISIKEN)
+List 3-5 specific major risks:
+- Risk 1: [Detailed explanation]
+- Risk 2: [Detailed explanation]
+- Risk 3: [Detailed explanation]
+Include: market risks, company-specific risks, sector headwinds
+
+## 4. OPPORTUNITIES (CHANCEN)
+List 3-5 specific growth opportunities:
+- Opportunity 1: [Detailed explanation]
+- Opportunity 2: [Detailed explanation]
+- Opportunity 3: [Detailed explanation]
+Include: catalysts, upcoming events, competitive advantages
+
+## 5. PRICE TARGET
+Provide 12-month price target: $XXX
+Justification: [Explain valuation method and assumptions]
+Upside/Downside: [Calculate percentage]
+
+## 6. SHORT SQUEEZE POTENTIAL
+Score: XX/100
+Analysis must include:
+- Freefloat: [Actual percentage or "Limited" if low]
+- Short Interest: [Actual % of float]
+- Days to Cover: [Actual number]
+- FTDs (Failure to Deliver): [Mention if significant]
+- Borrowing costs: [If available]
+- Volume spikes: [Recent activity]
+- Sentiment: [Social media/retail interest]
+
+Explain WHY this score: What makes a squeeze likely/unlikely?
+Probability: [EXTREM WAHRSCHEINLICH / WAHRSCHEINLICH / MÖGLICH / UNWAHRSCHEINLICH / SEHR UNWAHRSCHEINLICH]
+
+## 7. RECOMMENDATION
+Clear verdict: BUY / HOLD / SELL
+Reasoning: [3-5 sentences with key factors]
+Confidence Level: [High/Medium/Low]
+
+Compare your analysis with analyst consensus and explain any differences.
+Consider insider activity and news sentiment in your outlook."""
 
         return prompt
 
