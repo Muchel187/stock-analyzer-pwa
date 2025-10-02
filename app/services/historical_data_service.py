@@ -192,6 +192,11 @@ class HistoricalDataService:
         """
         Collect historical data from available sources and store in database
 
+        Priority Order (yfinance REMOVED due to severe rate limiting):
+        1. Twelve Data (PRIMARY) - 800 req/day, best for historical data
+        2. Alpha Vantage (SECONDARY) - 25 req/day, reliable
+        3. Fallback Service (TERTIARY) - Uses Finnhub or other sources
+
         Returns True if successful
         """
         try:
@@ -199,19 +204,15 @@ class HistoricalDataService:
             data = None
             source = None
 
-            # 1. Try yfinance (with rate limit handling)
-            if not data:
-                data, source = HistoricalDataService._fetch_from_yfinance(ticker, period)
-
-            # 2. Try Alpha Vantage
-            if not data:
-                data, source = HistoricalDataService._fetch_from_alpha_vantage(ticker, period)
-
-            # 3. Try Twelve Data
+            # 1. Try Twelve Data (PRIMARY - best rate limits)
             if not data:
                 data, source = HistoricalDataService._fetch_from_twelve_data(ticker, period)
 
-            # 4. Try existing alternative sources
+            # 2. Try Alpha Vantage (SECONDARY)
+            if not data:
+                data, source = HistoricalDataService._fetch_from_alpha_vantage(ticker, period)
+
+            # 3. Try existing alternative sources (TERTIARY)
             if not data:
                 data, source = HistoricalDataService._fetch_from_fallback(ticker, period)
 
@@ -232,46 +233,6 @@ class HistoricalDataService:
             logger.error(f"[Historical] Error collecting data for {ticker}: {e}")
             HistoricalDataService._update_metadata(ticker, success=False, error=str(e))
             return False
-
-    @staticmethod
-    def _fetch_from_yfinance(ticker: str, period: str) -> tuple:
-        """Fetch data from yfinance with rate limit handling"""
-        try:
-            import yfinance as yf
-
-            # Add random delay to avoid rate limiting
-            time.sleep(random.uniform(1, 3))
-
-            logger.info(f"[Historical] Fetching {ticker} from yfinance")
-
-            stock = yf.Ticker(ticker)
-            history = stock.history(period=period)
-
-            if history.empty:
-                logger.warning(f"[Historical] No data from yfinance for {ticker}")
-                return None, None
-
-            # Convert to our format
-            data = []
-            for idx, row in history.iterrows():
-                data.append({
-                    'date': idx.date(),
-                    'open': float(row['Open']),
-                    'high': float(row['High']),
-                    'low': float(row['Low']),
-                    'close': float(row['Close']),
-                    'volume': int(row['Volume'])
-                })
-
-            logger.info(f"[Historical] Got {len(data)} points from yfinance for {ticker}")
-            return data, 'yfinance'
-
-        except Exception as e:
-            if '429' in str(e) or 'Too Many Requests' in str(e):
-                logger.warning(f"[Historical] yfinance rate limited for {ticker}")
-            else:
-                logger.error(f"[Historical] yfinance error for {ticker}: {e}")
-            return None, None
 
     @staticmethod
     def _fetch_from_alpha_vantage(ticker: str, period: str) -> tuple:
