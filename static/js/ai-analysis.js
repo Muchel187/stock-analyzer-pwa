@@ -53,7 +53,7 @@ class AIAnalysisVisualizer {
                         <h3>📊 Due Diligence Zusammenfassung</h3>
                         <div class="ai-provider-badge">
                             <span class="provider-icon">✨</span>
-                            <span>${data.provider === 'google' ? 'Google Gemini' : 'OpenAI GPT'}</span>
+                            <span>${data.provider === 'google' ? 'Google Gemini 2.5 Pro' : 'OpenAI GPT-4'}</span>
                         </div>
                     </div>
 

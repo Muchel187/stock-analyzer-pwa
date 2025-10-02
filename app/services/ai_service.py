@@ -16,9 +16,10 @@ class AIService:
 
         if self.google_api_key:
             self.provider = 'google'
-            # Using Gemini 2.0 Flash Experimental (October 2025 - free tier, state-of-the-art)
-            self.api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key={self.google_api_key}"
-            logger.info("Using Google Gemini 2.0 Flash Experimental for stock analysis")
+            # Using Gemini 2.5 Pro (October 2025 - production-ready, enhanced reasoning)
+            # Note: Gemini 2.5 Pro is available as of October 2025 with improved analysis capabilities
+            self.api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={self.google_api_key}"
+            logger.info("Using Google Gemini 2.5 Pro for stock analysis")
         elif self.openai_api_key:
             self.provider = 'openai'
             self.api_url = "https://api.openai.com/v1/chat/completions"
@@ -89,8 +90,10 @@ class AIService:
                     }]
                 }],
                 "generationConfig": {
-                    "temperature": 0.3,
-                    "maxOutputTokens": 16384,  # Increased for comprehensive analysis with all sections
+                    "temperature": 0.4,  # Slightly higher for more creative analysis
+                    "maxOutputTokens": 8192,  # Gemini 2.5 Pro supports up to 8192 tokens
+                    "topP": 0.95,
+                    "topK": 40
                 }
             }
 
@@ -229,7 +232,7 @@ class AIService:
 DATA:
 {chr(10).join(['- ' + s for s in sections])}
 
-PROVIDE DETAILED ANALYSIS IN FOLLOWING SECTIONS:
+PROVIDE DETAILED ANALYSIS IN THE FOLLOWING 7 SECTIONS (ALL REQUIRED):
 
 ## 1. TECHNICAL ANALYSIS
 - Current trend direction (bullish/bearish/neutral)
@@ -244,49 +247,66 @@ PROVIDE DETAILED ANALYSIS IN FOLLOWING SECTIONS:
 - Growth prospects and catalysts
 - Profitability and margins analysis
 - Balance sheet health
-- Comparison with analyst consensus
+- Comparison with analyst consensus (if available)
 - Quality of management and strategy
 
 ## 3. KEY RISKS (HAUPTRISIKEN)
-List 3-5 specific major risks:
-- Risk 1: [Detailed explanation]
-- Risk 2: [Detailed explanation]
-- Risk 3: [Detailed explanation]
-Include: market risks, company-specific risks, sector headwinds
+List 3-5 specific major risks with detailed explanations:
+- Risk 1: [Specific risk with detailed explanation]
+- Risk 2: [Specific risk with detailed explanation]
+- Risk 3: [Specific risk with detailed explanation]
+- Risk 4: [Optional additional risk]
+- Risk 5: [Optional additional risk]
+Include: market risks, company-specific risks, sector headwinds, competitive threats
 
 ## 4. OPPORTUNITIES (CHANCEN)
-List 3-5 specific growth opportunities:
-- Opportunity 1: [Detailed explanation]
-- Opportunity 2: [Detailed explanation]
-- Opportunity 3: [Detailed explanation]
-Include: catalysts, upcoming events, competitive advantages
+List 3-5 specific growth opportunities with detailed explanations:
+- Opportunity 1: [Specific opportunity with detailed explanation]
+- Opportunity 2: [Specific opportunity with detailed explanation]
+- Opportunity 3: [Specific opportunity with detailed explanation]
+- Opportunity 4: [Optional additional opportunity]
+- Opportunity 5: [Optional additional opportunity]
+Include: growth catalysts, upcoming events, competitive advantages, market trends
 
 ## 5. PRICE TARGET
-Provide 12-month price target: $XXX
-Justification: [Explain valuation method and assumptions]
-Upside/Downside: [Calculate percentage]
+Provide 12-month price target: $XXX.XX
+Justification: [Explain valuation method (DCF, P/E multiple, etc.) and key assumptions]
+Upside/Downside: [Calculate exact percentage from current price ${stock_data.get('current_price', 'N/A')}]
+Target Range: [Provide low/high range: $XX - $XX]
 
 ## 6. SHORT SQUEEZE POTENTIAL
-Score: XX/100
-Analysis must include:
-- Freefloat: [Actual percentage or "Limited" if low]
-- Short Interest: [Actual % of float]
-- Days to Cover: [Actual number]
-- FTDs (Failure to Deliver): [Mention if significant]
-- Borrowing costs: [If available]
-- Volume spikes: [Recent activity]
-- Sentiment: [Social media/retail interest]
+Score: XX/100 (Must provide numeric score)
 
-Explain WHY this score: What makes a squeeze likely/unlikely?
-Probability: [EXTREM WAHRSCHEINLICH / WAHRSCHEINLICH / MÖGLICH / UNWAHRSCHEINLICH / SEHR UNWAHRSCHEINLICH]
+**Due Diligence Factors (provide ACTUAL DATA if available):**
+- Freefloat: [Provide percentage or state "Limited/Low/High"]
+- Short Interest: [Provide percentage of float, e.g., "25% of float"]
+- Days to Cover: [Provide number, e.g., "4.5 days"]
+- FTDs (Failure to Deliver): [State "Significant", "Moderate", "Low", or actual number]
+- Borrowing costs: [State "High", "Moderate", "Low" with percentage if known]
+- Volume spikes: [Describe recent trading activity]
+- Sentiment: [Social media/retail interest: Strong Bullish/Moderate/Bearish]
+- Options activity: [Mention any unusual activity]
+
+**Analysis Explanation:**
+Explain in 3-5 sentences WHY this score is justified. What specific factors make a squeeze LIKELY or UNLIKELY?
+Probability: [Choose ONE: EXTREM WAHRSCHEINLICH / WAHRSCHEINLICH / MÖGLICH / UNWAHRSCHEINLICH / SEHR UNWAHRSCHEINLICH]
+Reasoning: [Explain the probability assessment]
 
 ## 7. RECOMMENDATION
-Clear verdict: BUY / HOLD / SELL
-Reasoning: [3-5 sentences with key factors]
-Confidence Level: [High/Medium/Low]
+Clear verdict: **BUY** / **HOLD** / **SELL**
 
-Compare your analysis with analyst consensus and explain any differences.
-Consider insider activity and news sentiment in your outlook."""
+Reasoning: [Provide 4-6 sentences explaining the verdict with specific factors]
+- Key factor 1
+- Key factor 2
+- Key factor 3
+
+Confidence Level: [High/Medium/Low]
+Time Horizon: [Short-term (0-3 months) / Medium-term (3-12 months) / Long-term (1+ years)]
+
+Compare your analysis with analyst consensus (if available) and explain any significant differences.
+Consider insider activity and news sentiment in your outlook.
+
+IMPORTANT: You MUST provide ALL 7 sections. Do not skip any section. Use "N/A" or "Not available" if data is missing, but provide the section structure."""
 
         return prompt
 
@@ -301,12 +321,24 @@ Consider insider activity and news sentiment in your outlook."""
             'opportunities': '',
             'price_target': '',
             'short_squeeze': '',
+            'short_squeeze_details': {},  # NEW: Structured short squeeze data
             'recommendation': '',
             'summary': ''
         }
 
         current_section = None
         lines = response_text.split('\n')
+        
+        # Extract short squeeze details using regex
+        short_squeeze_patterns = {
+            'freefloat': r'freefloat[:\s]+([0-9.]+%?|limited|low|high)',
+            'short_interest': r'short\s+interest[:\s]+([0-9.]+%)',
+            'days_to_cover': r'days?\s+to\s+cover[:\s]+([0-9.]+)',
+            'ftd': r'ftds?[:\s]+(significant|high|low|moderate|none|[0-9,]+)',
+            'borrowing_cost': r'borrowing\s+cost[:\s]+([0-9.]+%|high|low|moderate)',
+            'volume_spike': r'volume\s+spike[:\s]+(yes|no|significant|moderate)',
+            'sentiment': r'sentiment[:\s]+(bullish|bearish|neutral|positive|negative)',
+        }
 
         for line in lines:
             line_lower = line.lower().strip()
@@ -317,54 +349,60 @@ Consider insider activity and news sentiment in your outlook."""
                     sections[current_section] += '\n'
                 continue
 
-            # Enhanced section detection with regex for numbered headers
-            # Match patterns like "## 1.", "1.", "##1.", "#1." with flexible spacing
+            # Enhanced section detection with multiple pattern matching
             
             # Section 1: Technical Analysis
-            if re.search(r'(?:##\s*)?1\.?\s*technical|technical\s*analysis', line_lower):
+            if re.search(r'(?:##\s*)?(?:1\.?|section\s+1)[:\s]*technical|^technical\s*analysis|^\*\*technical', line_lower):
                 current_section = 'technical_analysis'
                 continue
             
             # Section 2: Fundamental Analysis
-            elif re.search(r'(?:##\s*)?2\.?\s*fundamental|fundamental\s*analysis', line_lower):
+            elif re.search(r'(?:##\s*)?(?:2\.?|section\s+2)[:\s]*fundamental|^fundamental\s*analysis|^\*\*fundamental', line_lower):
                 current_section = 'fundamental_analysis'
                 continue
             
-            # Section 3: Key Risks
-            elif re.search(r'(?:##\s*)?3\.?\s*(?:key\s*)?risks|hauptrisiken', line_lower):
+            # Section 3: Key Risks (Hauptrisiken)
+            elif re.search(r'(?:##\s*)?(?:3\.?|section\s+3)[:\s]*(?:key\s*)?risks|^hauptrisiken|^\*\*(?:key\s*)?risks', line_lower):
                 if 'squeeze' not in line_lower:  # Exclude "Short Squeeze" from risks
                     current_section = 'risks'
                     continue
             
-            # Section 4: Opportunities
-            elif re.search(r'(?:##\s*)?4\.?\s*opportunit|chancen', line_lower):
+            # Section 4: Opportunities (Chancen)
+            elif re.search(r'(?:##\s*)?(?:4\.?|section\s+4)[:\s]*opportunit|^chancen|^growth\s+opportunit|^\*\*opportunit', line_lower):
                 current_section = 'opportunities'
                 continue
             
-            # Section 5: Price Target
-            elif re.search(r'(?:##\s*)?5\.?\s*price\s*target|kursziel', line_lower):
+            # Section 5: Price Target (Kursziel)
+            elif re.search(r'(?:##\s*)?(?:5\.?|section\s+5)[:\s]*price\s*target|^kursziel|^target\s+price|^\*\*price\s*target', line_lower):
                 current_section = 'price_target'
                 continue
             
             # Section 6: Short Squeeze
-            elif re.search(r'(?:##\s*)?6\.?\s*short\s*squeeze|squeeze\s*potential', line_lower):
+            elif re.search(r'(?:##\s*)?(?:6\.?|section\s+6)[:\s]*short\s*squeeze|^squeeze\s*potential|^\*\*short\s*squeeze', line_lower):
                 current_section = 'short_squeeze'
                 continue
             
             # Section 7: Recommendation
-            elif re.search(r'(?:##\s*)?7\.?\s*recommendation|empfehlung|verdict', line_lower):
+            elif re.search(r'(?:##\s*)?(?:7\.?|section\s+7)[:\s]*recommendation|^empfehlung|^verdict|^investment\s+recommendation|^\*\*recommendation', line_lower):
                 current_section = 'recommendation'
                 continue
             
+            # Extract short squeeze details from any line
+            for key, pattern in short_squeeze_patterns.items():
+                match = re.search(pattern, line_lower)
+                if match:
+                    sections['short_squeeze_details'][key] = match.group(1)
+            
             # Add content to current section
-            elif current_section:
-                # Only add line if it's not a markdown header (avoid capturing section titles)
-                if not line.strip().startswith('##') and not line.strip().startswith('#'):
+            if current_section:
+                # Don't add markdown headers or section titles
+                if not line.strip().startswith('##') and not line.strip().startswith('#') and not line.strip().startswith('**Section'):
                     sections[current_section] += line + '\n'
 
         # Clean up sections - remove empty lines at start/end
         for key in sections:
-            sections[key] = sections[key].strip()
+            if isinstance(sections[key], str):
+                sections[key] = sections[key].strip()
 
         # Create summary if not present
         if not sections['summary']:
@@ -376,8 +414,13 @@ Consider insider activity and news sentiment in your outlook."""
             else:
                 sections['summary'] = 'Analysis completed'
 
-        # Debug logging
-        logger.info(f"Parsed sections: {[(k, len(v)) for k, v in sections.items() if v]}")
+        # Debug logging - show what was found
+        logger.info(f"Parsed sections with content: {[(k, len(v) if isinstance(v, str) else len(v)) for k, v in sections.items() if v]}")
+        
+        # Log if key sections are missing
+        for key_section in ['risks', 'opportunities', 'price_target', 'recommendation']:
+            if not sections[key_section]:
+                logger.warning(f"Section '{key_section}' is EMPTY - AI response may be incomplete")
 
         return sections
 
