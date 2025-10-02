@@ -457,7 +457,7 @@ class FallbackDataService:
     def get_stock_quote(ticker: str) -> Optional[Dict[str, Any]]:
         """
         Try to get stock quote from available fallback sources.
-        If all API sources fail, use AI as ultimate fallback.
+        Returns None if all API sources fail (no AI fallback to avoid rate limits).
         """
         for source_name, service_class in FallbackDataService.SOURCES:
             logger.info(f"Trying {source_name} for {ticker}...")
@@ -470,26 +470,16 @@ class FallbackDataService:
                 logger.warning(f"{source_name} failed for {ticker}: {str(e)}")
                 continue
 
-        # Ultimate fallback: Use AI to generate stock data
-        logger.warning(f"All API sources failed for {ticker}, attempting AI fallback...")
-        try:
-            from app.services.ai_service import AIService
-            ai_service = AIService()
-            ai_data = ai_service.get_stock_data_from_ai(ticker)
-            if ai_data:
-                logger.info(f"Successfully retrieved {ticker} data from AI fallback")
-                return ai_data
-        except Exception as e:
-            logger.error(f"AI fallback also failed for {ticker}: {str(e)}")
-
-        logger.error(f"All fallback sources (including AI) failed for {ticker}")
+        # No AI fallback here - it causes rate limit issues
+        # AI should only be used for explicit analysis requests, not quote fetching
+        logger.error(f"All API sources failed for {ticker}")
         return None
 
     @staticmethod
     def get_company_info(ticker: str) -> Optional[Dict[str, Any]]:
         """
         Try to get company information from available sources with proper fallback.
-        Uses AI as ultimate fallback when all APIs fail.
+        Returns None if all API sources fail (no AI fallback to avoid rate limits).
         """
 
         # Try Finnhub first (60 requests/minute - more reliable)
@@ -514,18 +504,9 @@ class FallbackDataService:
             except Exception as e:
                 logger.warning(f"Alpha Vantage failed for company info {ticker}: {str(e)}")
 
-        # Ultimate fallback: Use AI
-        logger.warning(f"All API sources failed for company info {ticker}, attempting AI fallback...")
-        try:
-            from app.services.ai_service import AIService
-            ai_service = AIService()
-            ai_data = ai_service.get_stock_data_from_ai(ticker)
-            if ai_data:
-                logger.info(f"Successfully retrieved company info for {ticker} from AI fallback")
-                return ai_data
-        except Exception as e:
-            logger.error(f"AI fallback failed for company info {ticker}: {str(e)}")
-
+        # No AI fallback here - it causes rate limit issues
+        # AI should only be used for explicit analysis requests
+        logger.error(f"All API sources failed for company info {ticker}")
         return None
 
     @staticmethod
