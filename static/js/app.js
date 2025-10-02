@@ -541,7 +541,7 @@ class StockAnalyzerApp {
         }
 
         // Navigate to analysis page
-        this.showPage('analysis');
+        this.navigateToPage('analysis');
 
         // Set ticker in search field
         document.getElementById('stockSearch').value = ticker.toUpperCase();
@@ -564,7 +564,7 @@ class StockAnalyzerApp {
 
         try {
             // Navigate to analysis page
-            this.showPage('analysis');
+            this.navigateToPage('analysis');
 
             // Set ticker
             document.getElementById('stockSearch').value = ticker.toUpperCase();
