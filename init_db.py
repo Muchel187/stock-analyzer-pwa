@@ -11,7 +11,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from app import create_app, db
-from app.models import User, Portfolio, Transaction, WatchlistItem, Alert, StockCache
+from app.models import User, Portfolio, Transaction, Watchlist, Alert, StockCache
 
 def init_db():
     """Initialize database with tables"""
