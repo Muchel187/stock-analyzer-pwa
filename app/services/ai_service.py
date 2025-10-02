@@ -292,6 +292,8 @@ Consider insider activity and news sentiment in your outlook."""
 
     def _parse_ai_response(self, response_text: str) -> Dict[str, Any]:
         """Parse AI response into structured format with improved section detection"""
+        import re
+        
         sections = {
             'technical_analysis': '',
             'fundamental_analysis': '',
@@ -308,33 +310,56 @@ Consider insider activity and news sentiment in your outlook."""
 
         for line in lines:
             line_lower = line.lower().strip()
+            
+            # Skip empty lines
+            if not line_lower:
+                if current_section:
+                    sections[current_section] += '\n'
+                continue
 
-            # Enhanced section detection with numbered headers
-            if any(pattern in line_lower for pattern in ['## 1.', '1.', 'technical analysis', 'technisch']):
+            # Enhanced section detection with regex for numbered headers
+            # Match patterns like "## 1.", "1.", "##1.", "#1." with flexible spacing
+            
+            # Section 1: Technical Analysis
+            if re.search(r'(?:##\s*)?1\.?\s*technical|technical\s*analysis', line_lower):
                 current_section = 'technical_analysis'
                 continue
-            elif any(pattern in line_lower for pattern in ['## 2.', '2.', 'fundamental analysis', 'fundamental']):
+            
+            # Section 2: Fundamental Analysis
+            elif re.search(r'(?:##\s*)?2\.?\s*fundamental|fundamental\s*analysis', line_lower):
                 current_section = 'fundamental_analysis'
                 continue
-            elif any(pattern in line_lower for pattern in ['## 3.', '3.', 'key risks', 'hauptrisiken', 'risks']):
+            
+            # Section 3: Key Risks
+            elif re.search(r'(?:##\s*)?3\.?\s*(?:key\s*)?risks|hauptrisiken', line_lower):
                 if 'squeeze' not in line_lower:  # Exclude "Short Squeeze" from risks
                     current_section = 'risks'
                     continue
-            elif any(pattern in line_lower for pattern in ['## 4.', '4.', 'opportunities', 'chancen', 'katalysator']):
+            
+            # Section 4: Opportunities
+            elif re.search(r'(?:##\s*)?4\.?\s*opportunit|chancen', line_lower):
                 current_section = 'opportunities'
                 continue
-            elif any(pattern in line_lower for pattern in ['## 5.', '5.', 'price target', 'kursziel']):
+            
+            # Section 5: Price Target
+            elif re.search(r'(?:##\s*)?5\.?\s*price\s*target|kursziel', line_lower):
                 current_section = 'price_target'
                 continue
-            elif any(pattern in line_lower for pattern in ['## 6.', '6.', 'short squeeze', 'squeeze potential']):
+            
+            # Section 6: Short Squeeze
+            elif re.search(r'(?:##\s*)?6\.?\s*short\s*squeeze|squeeze\s*potential', line_lower):
                 current_section = 'short_squeeze'
                 continue
-            elif any(pattern in line_lower for pattern in ['## 7.', '7.', 'recommendation', 'empfehlung', 'verdict']):
+            
+            # Section 7: Recommendation
+            elif re.search(r'(?:##\s*)?7\.?\s*recommendation|empfehlung|verdict', line_lower):
                 current_section = 'recommendation'
                 continue
+            
+            # Add content to current section
             elif current_section:
-                # Only add line if it's not a section header
-                if not line.strip().startswith('#'):
+                # Only add line if it's not a markdown header (avoid capturing section titles)
+                if not line.strip().startswith('##') and not line.strip().startswith('#'):
                     sections[current_section] += line + '\n'
 
         # Clean up sections - remove empty lines at start/end
