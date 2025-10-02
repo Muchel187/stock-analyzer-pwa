@@ -55,9 +55,9 @@ def get_price_history(ticker):
 
 @bp.route('/<ticker>/analyze-with-ai', methods=['GET'])
 def analyze_with_ai_get(ticker):
-    """Analyze stock with AI assistance (GET method)"""
+    """Analyze stock with AI assistance (GET method) - Enhanced with analyst data, insider transactions, and news sentiment"""
     try:
-        # Get stock data
+        # Get stock data (now includes analyst_ratings, price_target, insider_transactions)
         stock_info = StockService.get_stock_info(ticker)
         if not stock_info:
             return jsonify({'error': f'Stock {ticker} not found'}), 404
@@ -65,6 +65,10 @@ def analyze_with_ai_get(ticker):
         # Get additional analysis data
         technical = StockService.calculate_technical_indicators(ticker)
         fundamental = StockService.get_fundamental_analysis(ticker)
+
+        # Get aggregated news sentiment
+        from app.services.news_service import NewsService
+        news_sentiment = NewsService.get_aggregated_sentiment(ticker, days=7)
 
         # Analyze short squeeze potential
         from app.services.short_squeeze_analyzer import ShortSqueezeAnalyzer
@@ -83,20 +87,22 @@ def analyze_with_ai_get(ticker):
             squeeze_analysis['real_short_data'] = short_data
             squeeze_analysis['note'] = 'Enhanced with actual short interest data from ChartExchange.com'
 
-        # Generate AI analysis
+        # Generate AI analysis with enhanced data
         ai_service = AIService()
         ai_analysis = ai_service.analyze_stock_with_ai(
             stock_info,
             technical,
             fundamental,
-            short_data
+            short_data,
+            news_sentiment  # NEW: Pass news sentiment
         )
 
         if not ai_analysis:
             return jsonify({'error': 'AI analysis failed'}), 500
 
-        # Add squeeze analysis to response
+        # Add squeeze analysis and news sentiment to response
         ai_analysis['squeeze_analysis'] = squeeze_analysis
+        ai_analysis['news_sentiment'] = news_sentiment
         ai_analysis['timestamp'] = datetime.now(timezone.utc).isoformat()
 
         return jsonify(ai_analysis), 200

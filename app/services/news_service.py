@@ -300,3 +300,76 @@ class NewsService:
         except Exception as e:
             logger.error(f"Error fetching market news: {str(e)}")
             return None
+
+    @staticmethod
+    def get_aggregated_sentiment(ticker: str, days: int = 7) -> Dict[str, Any]:
+        """
+        Get news and aggregate sentiment scores
+        
+        Args:
+            ticker: Stock symbol
+            days: Days to look back (default: 7)
+            
+        Returns:
+            dict with overall sentiment score and distribution
+        """
+        try:
+            news = NewsService.get_company_news(ticker, days=days, limit=20)
+            
+            if not news or 'news' not in news:
+                return {
+                    'overall_score': 0,
+                    'sentiment_distribution': {'bullish': 0, 'neutral': 0, 'bearish': 0},
+                    'sentiment_percentages': {'bullish_pct': 0, 'neutral_pct': 0, 'bearish_pct': 0},
+                    'article_count': 0,
+                    'period_days': days
+                }
+            
+            articles = news['news']
+            bullish_count = 0
+            neutral_count = 0
+            bearish_count = 0
+            
+            for article in articles:
+                sentiment = article.get('sentiment', 'neutral')
+                if sentiment == 'bullish':
+                    bullish_count += 1
+                elif sentiment == 'bearish':
+                    bearish_count += 1
+                else:
+                    neutral_count += 1
+            
+            total = len(articles)
+            
+            # Calculate overall score (-1 to +1)
+            if total > 0:
+                bullish_pct = bullish_count / total
+                bearish_pct = bearish_count / total
+                overall_score = bullish_pct - bearish_pct
+            else:
+                overall_score = 0
+            
+            return {
+                'overall_score': round(overall_score, 2),
+                'sentiment_distribution': {
+                    'bullish': bullish_count,
+                    'neutral': neutral_count,
+                    'bearish': bearish_count
+                },
+                'sentiment_percentages': {
+                    'bullish_pct': round(bullish_count / total * 100, 1) if total > 0 else 0,
+                    'neutral_pct': round(neutral_count / total * 100, 1) if total > 0 else 0,
+                    'bearish_pct': round(bearish_count / total * 100, 1) if total > 0 else 0
+                },
+                'article_count': total,
+                'period_days': days
+            }
+        except Exception as e:
+            logger.error(f"Error aggregating sentiment for {ticker}: {str(e)}")
+            return {
+                'overall_score': 0,
+                'sentiment_distribution': {'bullish': 0, 'neutral': 0, 'bearish': 0},
+                'sentiment_percentages': {'bullish_pct': 0, 'neutral_pct': 0, 'bearish_pct': 0},
+                'article_count': 0,
+                'period_days': days
+            }

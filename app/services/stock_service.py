@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+import requests
+import os
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from app.models import StockCache
@@ -38,6 +40,22 @@ class StockService:
             processed_info.setdefault('sector', 'Unknown')
             processed_info.setdefault('industry', 'Unknown')
             processed_info.setdefault('ticker', ticker.upper())
+
+            # Get enhanced data: Analyst ratings, price targets, insider transactions
+            analyst_ratings = StockService.get_analyst_ratings(ticker)
+            if analyst_ratings:
+                processed_info['analyst_ratings'] = analyst_ratings
+                logger.info(f"Added analyst ratings for {ticker}")
+
+            price_target = StockService.get_price_target(ticker)
+            if price_target:
+                processed_info['price_target'] = price_target
+                logger.info(f"Added price target for {ticker}")
+
+            insider_data = StockService.get_insider_transactions(ticker)
+            if insider_data:
+                processed_info['insider_transactions'] = insider_data
+                logger.info(f"Added insider transactions for {ticker}")
 
             # Cache the result
             StockCache.set_cache(ticker, processed_info, 'info')
@@ -337,3 +355,160 @@ class StockService:
             return "Sell"
         else:
             return "Strong Sell"
+
+    @staticmethod
+    def get_analyst_ratings(ticker: str) -> Optional[Dict[str, Any]]:
+        """
+        Get analyst ratings from Finnhub
+        Endpoint: https://finnhub.io/api/v1/stock/recommendation
+        Returns last quarter's ratings aggregated
+        """
+        api_key = os.getenv('FINNHUB_API_KEY')
+        if not api_key:
+            logger.warning("Finnhub API key not configured")
+            return None
+        
+        try:
+            url = "https://finnhub.io/api/v1/stock/recommendation"
+            params = {'symbol': ticker.upper(), 'token': api_key}
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            if not data or len(data) == 0:
+                logger.info(f"No analyst ratings available for {ticker}")
+                return None
+            
+            # Get most recent rating
+            latest = data[0]
+            
+            return {
+                'buy': latest.get('buy', 0),
+                'hold': latest.get('hold', 0),
+                'sell': latest.get('sell', 0),
+                'strong_buy': latest.get('strongBuy', 0),
+                'strong_sell': latest.get('strongSell', 0),
+                'period': latest.get('period', ''),
+                'total_analysts': sum([
+                    latest.get('buy', 0),
+                    latest.get('hold', 0),
+                    latest.get('sell', 0),
+                    latest.get('strongBuy', 0),
+                    latest.get('strongSell', 0)
+                ])
+            }
+        except Exception as e:
+            logger.error(f"Error getting analyst ratings for {ticker}: {str(e)}")
+            return None
+
+    @staticmethod
+    def get_price_target(ticker: str) -> Optional[Dict[str, Any]]:
+        """
+        Get analyst price targets from Finnhub
+        Endpoint: https://finnhub.io/api/v1/stock/price-target
+        """
+        api_key = os.getenv('FINNHUB_API_KEY')
+        if not api_key:
+            logger.warning("Finnhub API key not configured")
+            return None
+        
+        try:
+            url = "https://finnhub.io/api/v1/stock/price-target"
+            params = {'symbol': ticker.upper(), 'token': api_key}
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            if not data or 'targetMean' not in data:
+                logger.info(f"No price target available for {ticker}")
+                return None
+            
+            return {
+                'target_high': data.get('targetHigh'),
+                'target_low': data.get('targetLow'),
+                'target_mean': data.get('targetMean'),
+                'target_median': data.get('targetMedian'),
+                'last_updated': data.get('lastUpdated'),
+                'number_analysts': data.get('numberOfAnalysts', 0)
+            }
+        except Exception as e:
+            logger.error(f"Error getting price target for {ticker}: {str(e)}")
+            return None
+
+    @staticmethod
+    def get_insider_transactions(ticker: str, days_back: int = 180) -> Optional[Dict[str, Any]]:
+        """
+        Get insider transactions from Finnhub (last 6 months)
+        Endpoint: https://finnhub.io/api/v1/stock/insider-transactions
+        """
+        api_key = os.getenv('FINNHUB_API_KEY')
+        if not api_key:
+            logger.warning("Finnhub API key not configured")
+            return None
+        
+        try:
+            from_date = (datetime.now() - timedelta(days=days_back)).strftime('%Y-%m-%d')
+            
+            url = "https://finnhub.io/api/v1/stock/insider-transactions"
+            params = {
+                'symbol': ticker.upper(),
+                'from': from_date,
+                'token': api_key
+            }
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            if not data or 'data' not in data:
+                logger.info(f"No insider transactions available for {ticker}")
+                return None
+            
+            transactions = data['data']
+            
+            # Aggregate buy vs sell
+            total_shares_bought = 0
+            total_shares_sold = 0
+            total_value_bought = 0
+            total_value_sold = 0
+            transaction_count = 0
+            
+            for tx in transactions:
+                shares = tx.get('share', 0)
+                change = tx.get('change', 0)
+                
+                if change > 0:  # Buy
+                    total_shares_bought += shares
+                    if 'transactionPrice' in tx and tx['transactionPrice']:
+                        total_value_bought += shares * tx['transactionPrice']
+                elif change < 0:  # Sell
+                    total_shares_sold += abs(shares)
+                    if 'transactionPrice' in tx and tx['transactionPrice']:
+                        total_value_sold += abs(shares) * tx['transactionPrice']
+                
+                transaction_count += 1
+            
+            net_shares = total_shares_bought - total_shares_sold
+            net_value = total_value_bought - total_value_sold
+            
+            # Determine signal
+            if net_value > 50000:  # Net buying > $50k
+                signal = 'bullish'
+            elif net_value < -50000:  # Net selling > $50k
+                signal = 'bearish'
+            else:
+                signal = 'neutral'
+            
+            return {
+                'shares_bought': total_shares_bought,
+                'shares_sold': total_shares_sold,
+                'net_shares': net_shares,
+                'value_bought': total_value_bought,
+                'value_sold': total_value_sold,
+                'net_value': net_value,
+                'transaction_count': transaction_count,
+                'period_days': days_back,
+                'signal': signal
+            }
+        except Exception as e:
+            logger.error(f"Error getting insider transactions for {ticker}: {str(e)}")
+            return None

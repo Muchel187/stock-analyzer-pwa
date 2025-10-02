@@ -33,8 +33,9 @@ class AIService:
     def analyze_stock_with_ai(self, stock_data: Dict[str, Any],
                                technical_indicators: Dict[str, Any] = None,
                                fundamental_analysis: Dict[str, Any] = None,
-                               short_data: Dict[str, Any] = None) -> Optional[Dict[str, Any]]:
-        """Generate AI-powered analysis for a stock"""
+                               short_data: Dict[str, Any] = None,
+                               news_sentiment: Dict[str, Any] = None) -> Optional[Dict[str, Any]]:
+        """Generate AI-powered analysis for a stock with enhanced data"""
         if not self.provider:
             logger.warning("No AI API key configured")
             return {
@@ -43,7 +44,7 @@ class AIService:
             }
 
         try:
-            prompt = self._create_analysis_prompt(stock_data, technical_indicators, fundamental_analysis, short_data)
+            prompt = self._create_analysis_prompt(stock_data, technical_indicators, fundamental_analysis, short_data, news_sentiment)
 
             if self.provider == 'google':
                 analysis_text = self._call_google_gemini(prompt)
@@ -140,8 +141,9 @@ class AIService:
     def _create_analysis_prompt(self, stock_data: Dict[str, Any],
                                 technical_indicators: Dict[str, Any] = None,
                                 fundamental_analysis: Dict[str, Any] = None,
-                                short_data: Dict[str, Any] = None) -> str:
-        """Create a comprehensive prompt for AI analysis"""
+                                short_data: Dict[str, Any] = None,
+                                news_sentiment: Dict[str, Any] = None) -> str:
+        """Create a comprehensive prompt for AI analysis with enhanced data"""
         prompt = f"""
 Analyze the following stock data for {stock_data.get('ticker', 'Unknown')} ({stock_data.get('company_name', 'Unknown Company')}):
 
@@ -174,6 +176,63 @@ Analyze the following stock data for {stock_data.get('ticker', 'Unknown')} ({sto
 - Current Recommendation: {fundamental_analysis.get('recommendation', 'N/A')}
 """
 
+        # NEW: Analyst Consensus
+        if stock_data.get('analyst_ratings'):
+            ratings = stock_data['analyst_ratings']
+            total = ratings['total_analysts']
+            if total > 0:
+                prompt += f"""
+## Analyst Consensus ({ratings['period']}):
+- Total Analysts: {total}
+- Strong Buy: {ratings['strong_buy']} ({ratings['strong_buy']/total*100:.1f}%)
+- Buy: {ratings['buy']} ({ratings['buy']/total*100:.1f}%)
+- Hold: {ratings['hold']} ({ratings['hold']/total*100:.1f}%)
+- Sell: {ratings['sell']} ({ratings['sell']/total*100:.1f}%)
+- Strong Sell: {ratings['strong_sell']} ({ratings['strong_sell']/total*100:.1f}%)
+"""
+
+        if stock_data.get('price_target'):
+            target = stock_data['price_target']
+            if target['target_mean']:
+                prompt += f"""
+- Average Price Target: ${target['target_mean']:.2f}
+- Target Range: ${target['target_low']:.2f} - ${target['target_high']:.2f}
+- Number of Estimates: {target['number_analysts']}
+
+**ANALYST COMPARISON TASK**: Compare your analysis with the analyst consensus. If your recommendation differs significantly, explain why. Are the analysts missing something, or is there information they have that supports their view?
+"""
+
+        # NEW: Insider Activity
+        if stock_data.get('insider_transactions'):
+            insider = stock_data['insider_transactions']
+            signal_emoji = "🟢" if insider['signal'] == 'bullish' else "🔴" if insider['signal'] == 'bearish' else "⚪"
+            prompt += f"""
+## Insider Transactions (Last {insider['period_days']} days):
+{signal_emoji} Signal: {insider['signal'].upper()}
+- Shares Bought: {insider['shares_bought']:,}
+- Shares Sold: {insider['shares_sold']:,}
+- Net Position: {insider['net_shares']:,} shares
+- Net Value: ${insider['net_value']:,.0f}
+- Total Transactions: {insider['transaction_count']}
+
+**INSIDER ACTIVITY TASK**: Interpret this insider activity. Does management show confidence in the company by buying shares, or are they selling? This can be a strong signal about the company's near-term prospects. Consider whether insiders might have information not yet public.
+"""
+
+        # NEW: News Sentiment
+        if news_sentiment and news_sentiment.get('article_count', 0) > 0:
+            sent = news_sentiment
+            sentiment_emoji = "🟢" if sent['overall_score'] > 0.2 else "🔴" if sent['overall_score'] < -0.2 else "⚪"
+            prompt += f"""
+## Recent News Sentiment (Last {sent['period_days']} days):
+{sentiment_emoji} Overall Score: {sent['overall_score']:.2f} (-1 to +1 scale)
+- Bullish Articles: {sent['sentiment_percentages']['bullish_pct']}% ({sent['sentiment_distribution']['bullish']} articles)
+- Neutral Articles: {sent['sentiment_percentages']['neutral_pct']}% ({sent['sentiment_distribution']['neutral']} articles)
+- Bearish Articles: {sent['sentiment_percentages']['bearish_pct']}% ({sent['sentiment_distribution']['bearish']} articles)
+- Total Articles Analyzed: {sent['article_count']}
+
+**NEWS SENTIMENT TASK**: Consider this news sentiment in your short-term outlook (1-3 months). A highly positive sentiment can drive near-term momentum and FOMO buying, while negative sentiment may create buying opportunities or signal emerging risks. Assess whether the sentiment is justified by fundamentals or driven by hype.
+"""
+
         prompt += """
 Please provide a comprehensive analysis covering:
 1. Technical Analysis insights
@@ -203,7 +262,7 @@ Please provide a comprehensive analysis covering:
    - Recent price momentum and volume spikes
    - Gamma squeeze potential from options activity
    - Social media sentiment and retail interest
-   Rate the short squeeze risk from 0-100 (0=no risk, 100=extreme risk) and provide specific reasoning
+   Rate the short squeeze risk from 0-100 (0=no risk, 100=extreme risk) and provide specific reasoning with concrete data points
 7. Final Investment Recommendation (BUY/HOLD/SELL) with clear reasoning
 
 Format your response with clear section headings.
