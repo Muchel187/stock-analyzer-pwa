@@ -335,7 +335,8 @@ class TwelveDataService:
 
 class FallbackDataService:
     """
-    Coordinated fallback service that tries multiple data sources in order
+    Coordinated fallback service that tries multiple data sources in order,
+    including AI fallback when all traditional APIs are exhausted
     """
 
     # Order of preference for data sources
@@ -347,7 +348,10 @@ class FallbackDataService:
 
     @staticmethod
     def get_stock_quote(ticker: str) -> Optional[Dict[str, Any]]:
-        """Try to get stock quote from available fallback sources"""
+        """
+        Try to get stock quote from available fallback sources.
+        If all API sources fail, use AI as ultimate fallback.
+        """
         for source_name, service_class in FallbackDataService.SOURCES:
             logger.info(f"Trying {source_name} for {ticker}...")
             try:
@@ -359,12 +363,27 @@ class FallbackDataService:
                 logger.warning(f"{source_name} failed for {ticker}: {str(e)}")
                 continue
 
-        logger.error(f"All fallback sources failed for {ticker}")
+        # Ultimate fallback: Use AI to generate stock data
+        logger.warning(f"All API sources failed for {ticker}, attempting AI fallback...")
+        try:
+            from app.services.ai_service import AIService
+            ai_service = AIService()
+            ai_data = ai_service.get_stock_data_from_ai(ticker)
+            if ai_data:
+                logger.info(f"Successfully retrieved {ticker} data from AI fallback")
+                return ai_data
+        except Exception as e:
+            logger.error(f"AI fallback also failed for {ticker}: {str(e)}")
+
+        logger.error(f"All fallback sources (including AI) failed for {ticker}")
         return None
 
     @staticmethod
     def get_company_info(ticker: str) -> Optional[Dict[str, Any]]:
-        """Try to get company information from available sources with proper fallback"""
+        """
+        Try to get company information from available sources with proper fallback.
+        Uses AI as ultimate fallback when all APIs fail.
+        """
 
         # Try Finnhub first (60 requests/minute - more reliable)
         if os.getenv('FINNHUB_API_KEY'):
@@ -388,11 +407,26 @@ class FallbackDataService:
             except Exception as e:
                 logger.warning(f"Alpha Vantage failed for company info {ticker}: {str(e)}")
 
+        # Ultimate fallback: Use AI
+        logger.warning(f"All API sources failed for company info {ticker}, attempting AI fallback...")
+        try:
+            from app.services.ai_service import AIService
+            ai_service = AIService()
+            ai_data = ai_service.get_stock_data_from_ai(ticker)
+            if ai_data:
+                logger.info(f"Successfully retrieved company info for {ticker} from AI fallback")
+                return ai_data
+        except Exception as e:
+            logger.error(f"AI fallback failed for company info {ticker}: {str(e)}")
+
         return None
 
     @staticmethod
     def get_historical_data(ticker: str, outputsize: int = 30) -> Optional[Dict[str, Any]]:
-        """Try to get historical price data from available sources with proper fallback"""
+        """
+        Try to get historical price data from available sources with proper fallback.
+        Uses AI as ultimate fallback when all APIs fail.
+        """
 
         # Try Twelve Data first (800 requests/day - more reliable)
         if os.getenv('TWELVE_DATA_API_KEY'):
@@ -429,6 +463,35 @@ class FallbackDataService:
                 logger.info(f"Finnhub doesn't support historical time series, skipping")
             except Exception as e:
                 logger.warning(f"Finnhub failed for historical {ticker}: {str(e)}")
+
+        # Ultimate fallback: Use AI for historical data
+        logger.warning(f"All API sources failed for historical data {ticker}, attempting AI fallback...")
+        try:
+            from app.services.ai_service import AIService
+            ai_service = AIService()
+
+            # Map outputsize to period
+            period_map = {
+                30: '1mo', 90: '3mo', 180: '6mo',
+                365: '1y', 730: '2y', 1825: '5y'
+            }
+            period = '1mo'  # default
+            for days, p in period_map.items():
+                if outputsize <= days:
+                    period = p
+                    break
+
+            ai_data = ai_service.get_historical_data_from_ai(ticker, period)
+            if ai_data and ai_data.get('data'):
+                logger.info(f"Successfully retrieved historical data for {ticker} from AI fallback")
+                # Convert to standard format
+                return {
+                    'ticker': ticker.upper(),
+                    'data': ai_data['data'],
+                    'source': 'AI_FALLBACK'
+                }
+        except Exception as e:
+            logger.error(f"AI fallback failed for historical data {ticker}: {str(e)}")
 
         logger.warning(f"No fallback source available for historical data: {ticker}")
         return None

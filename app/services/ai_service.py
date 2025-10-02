@@ -35,6 +35,226 @@ class AIService:
             self.provider_name = 'None'
             logger.warning("No AI API key configured")
 
+    def get_stock_data_from_ai(self, ticker: str) -> Optional[Dict[str, Any]]:
+        """
+        AI Fallback: Get stock data from AI when all API providers are exhausted.
+        The AI provides current estimates based on its training data.
+
+        Note: This is a fallback mechanism. Data may not be real-time and should be
+        used only when traditional APIs are unavailable.
+        """
+        if not self.provider:
+            logger.warning("No AI API configured for fallback data retrieval")
+            return None
+
+        try:
+            prompt = f"""You are a financial data provider. Provide the most recent available data for stock ticker {ticker.upper()}.
+
+Return the data in the following JSON format (no additional text, just valid JSON):
+
+{{
+  "ticker": "{ticker.upper()}",
+  "company_name": "Full company name",
+  "current_price": <current price estimate>,
+  "previous_close": <previous close>,
+  "open": <today's open>,
+  "day_high": <today's high>,
+  "day_low": <today's low>,
+  "volume": <average volume>,
+  "market_cap": <market cap in millions>,
+  "pe_ratio": <P/E ratio or null>,
+  "dividend_yield": <dividend yield % or null>,
+  "week_52_high": <52 week high>,
+  "week_52_low": <52 week low>,
+  "sector": "Sector name",
+  "industry": "Industry name",
+  "description": "Brief company description",
+  "source": "AI_FALLBACK",
+  "data_freshness": "Based on training data - may not be real-time",
+  "historical_data": [
+    {{
+      "date": "YYYY-MM-DD (last 30 trading days, most recent first)",
+      "open": <price>,
+      "high": <price>,
+      "low": <price>,
+      "close": <price>,
+      "volume": <volume>
+    }}
+  ],
+  "technical_indicators": {{
+    "rsi": <RSI value 0-100>,
+    "macd": <MACD value>,
+    "macd_signal": <MACD signal>,
+    "sma_20": <20-day SMA>,
+    "sma_50": <50-day SMA>,
+    "sma_200": <200-day SMA>,
+    "ema_12": <12-day EMA>,
+    "ema_26": <26-day EMA>,
+    "bollinger_upper": <upper band>,
+    "bollinger_middle": <middle band>,
+    "bollinger_lower": <lower band>,
+    "volatility": <annualized volatility>
+  }},
+  "fundamental_metrics": {{
+    "revenue": <annual revenue in millions>,
+    "net_income": <net income in millions>,
+    "earnings_per_share": <EPS>,
+    "book_value": <book value per share>,
+    "debt_to_equity": <D/E ratio>,
+    "roe": <ROE %>,
+    "profit_margin": <profit margin %>,
+    "operating_margin": <operating margin %>
+  }}
+}}
+
+Provide realistic estimates based on your knowledge. If you don't have data, use reasonable industry averages."""
+
+            logger.info(f"Fetching AI fallback data for {ticker}")
+
+            if self.provider == 'google':
+                response = requests.post(
+                    self.api_url,
+                    json={
+                        "contents": [{
+                            "parts": [{"text": prompt}]
+                        }],
+                        "generationConfig": {
+                            "temperature": 0.1,  # Low temperature for factual data
+                            "maxOutputTokens": 4096
+                        }
+                    },
+                    timeout=60
+                )
+            else:  # OpenAI
+                response = requests.post(
+                    self.api_url,
+                    headers=self.headers,
+                    json={
+                        "model": "gpt-4",
+                        "messages": [{"role": "user", "content": prompt}],
+                        "temperature": 0.1,
+                        "max_tokens": 4096
+                    },
+                    timeout=60
+                )
+
+            response.raise_for_status()
+            data = response.json()
+
+            # Extract response text
+            if self.provider == 'google':
+                response_text = data['candidates'][0]['content']['parts'][0]['text']
+            else:
+                response_text = data['choices'][0]['message']['content']
+
+            # Parse JSON from response
+            import re
+            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+            if json_match:
+                stock_data = json.loads(json_match.group(0))
+                logger.info(f"Successfully retrieved AI fallback data for {ticker}")
+                return stock_data
+            else:
+                logger.error(f"Could not parse JSON from AI response for {ticker}")
+                return None
+
+        except Exception as e:
+            logger.error(f"Error getting AI fallback data for {ticker}: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return None
+
+    def get_historical_data_from_ai(self, ticker: str, period: str = '1mo') -> Optional[Dict[str, Any]]:
+        """
+        AI Fallback: Get historical price data from AI.
+        Returns realistic historical data based on known patterns.
+        """
+        if not self.provider:
+            logger.warning("No AI API configured for fallback historical data")
+            return None
+
+        try:
+            # Map period to days
+            period_days = {
+                '1mo': 30, '3mo': 90, '6mo': 180,
+                '1y': 365, '2y': 730, '5y': 1825
+            }
+            days = period_days.get(period, 30)
+
+            prompt = f"""Provide historical stock price data for {ticker.upper()} for the last {days} trading days.
+
+Return ONLY valid JSON (no markdown, no extra text):
+
+{{
+  "ticker": "{ticker.upper()}",
+  "period": "{period}",
+  "data": [
+    {{
+      "date": "YYYY-MM-DD (most recent first)",
+      "open": <price>,
+      "high": <price>,
+      "low": <price>,
+      "close": <price>,
+      "volume": <volume>
+    }}
+    // ... {days} entries total
+  ],
+  "source": "AI_FALLBACK"
+}}
+
+Base the data on realistic price movements for this stock. Use your knowledge of this company's typical price range and volatility."""
+
+            logger.info(f"Fetching AI fallback historical data for {ticker} ({period})")
+
+            if self.provider == 'google':
+                response = requests.post(
+                    self.api_url,
+                    json={
+                        "contents": [{"parts": [{"text": prompt}]}],
+                        "generationConfig": {
+                            "temperature": 0.1,
+                            "maxOutputTokens": 8192
+                        }
+                    },
+                    timeout=60
+                )
+            else:
+                response = requests.post(
+                    self.api_url,
+                    headers=self.headers,
+                    json={
+                        "model": "gpt-4",
+                        "messages": [{"role": "user", "content": prompt}],
+                        "temperature": 0.1,
+                        "max_tokens": 8192
+                    },
+                    timeout=60
+                )
+
+            response.raise_for_status()
+            data = response.json()
+
+            if self.provider == 'google':
+                response_text = data['candidates'][0]['content']['parts'][0]['text']
+            else:
+                response_text = data['choices'][0]['message']['content']
+
+            import re
+            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+            if json_match:
+                historical_data = json.loads(json_match.group(0))
+                logger.info(f"Successfully retrieved AI fallback historical data for {ticker}")
+                return historical_data
+            else:
+                logger.error(f"Could not parse JSON from AI historical response for {ticker}")
+                return None
+
+        except Exception as e:
+            logger.error(f"Error getting AI fallback historical data for {ticker}: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return None
+
     def analyze_stock_with_ai(self, stock_data: Dict[str, Any],
                                technical_indicators: Dict[str, Any] = None,
                                fundamental_analysis: Dict[str, Any] = None,
