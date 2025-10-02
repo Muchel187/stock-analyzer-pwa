@@ -110,6 +110,22 @@ class StockAnalyzerApp {
             e.preventDefault();
             await this.handleAddToWatchlist(e);
         });
+
+        // Password confirmation checker (real-time validation)
+        const passwordConfirm = document.getElementById('registerPasswordConfirm');
+        const password = document.getElementById('registerPassword');
+        passwordConfirm?.addEventListener('input', () => {
+            const matchIndicator = document.getElementById('passwordMatch');
+            if (password.value === passwordConfirm.value && password.value.length >= 6) {
+                matchIndicator.textContent = '✓ Passwörter stimmen überein';
+                matchIndicator.style.color = '#27ae60';
+            } else if (passwordConfirm.value.length > 0) {
+                matchIndicator.textContent = '❌ Passwörter stimmen nicht überein';
+                matchIndicator.style.color = '#e74c3c';
+            } else {
+                matchIndicator.textContent = '';
+            }
+        });
     }
 
     async checkAuthentication() {
@@ -1663,6 +1679,21 @@ class StockAnalyzerApp {
         const email = document.getElementById('registerEmail').value;
         const username = document.getElementById('registerUsername').value;
         const password = document.getElementById('registerPassword').value;
+        const passwordConfirm = document.getElementById('registerPasswordConfirm').value;
+
+        // Validate password match
+        if (password !== passwordConfirm) {
+            this.showNotification('Passwörter stimmen nicht überein', 'error');
+            document.getElementById('passwordMatch').textContent = '❌ Passwörter stimmen nicht überein';
+            document.getElementById('passwordMatch').style.color = '#e74c3c';
+            return;
+        }
+
+        // Validate password length
+        if (password.length < 6) {
+            this.showNotification('Passwort muss mindestens 6 Zeichen lang sein', 'error');
+            return;
+        }
 
         try {
             const response = await api.register(email, username, password);
