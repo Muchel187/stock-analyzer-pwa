@@ -291,7 +291,7 @@ Consider insider activity and news sentiment in your outlook."""
         return prompt
 
     def _parse_ai_response(self, response_text: str) -> Dict[str, Any]:
-        """Parse AI response into structured format"""
+        """Parse AI response into structured format with improved section detection"""
         sections = {
             'technical_analysis': '',
             'fundamental_analysis': '',
@@ -309,26 +309,50 @@ Consider insider activity and news sentiment in your outlook."""
         for line in lines:
             line_lower = line.lower().strip()
 
-            if 'technical analysis' in line_lower:
+            # Enhanced section detection with numbered headers
+            if any(pattern in line_lower for pattern in ['## 1.', '1.', 'technical analysis', 'technisch']):
                 current_section = 'technical_analysis'
-            elif 'fundamental analysis' in line_lower:
+                continue
+            elif any(pattern in line_lower for pattern in ['## 2.', '2.', 'fundamental analysis', 'fundamental']):
                 current_section = 'fundamental_analysis'
-            elif 'risk' in line_lower and 'squeeze' not in line_lower:
-                current_section = 'risks'
-            elif 'opportunit' in line_lower:
+                continue
+            elif any(pattern in line_lower for pattern in ['## 3.', '3.', 'key risks', 'hauptrisiken', 'risks']):
+                if 'squeeze' not in line_lower:  # Exclude "Short Squeeze" from risks
+                    current_section = 'risks'
+                    continue
+            elif any(pattern in line_lower for pattern in ['## 4.', '4.', 'opportunities', 'chancen', 'katalysator']):
                 current_section = 'opportunities'
-            elif 'price target' in line_lower or 'kursziel' in line_lower:
+                continue
+            elif any(pattern in line_lower for pattern in ['## 5.', '5.', 'price target', 'kursziel']):
                 current_section = 'price_target'
-            elif 'short squeeze' in line_lower or 'squeeze potential' in line_lower:
+                continue
+            elif any(pattern in line_lower for pattern in ['## 6.', '6.', 'short squeeze', 'squeeze potential']):
                 current_section = 'short_squeeze'
-            elif 'recommendation' in line_lower:
+                continue
+            elif any(pattern in line_lower for pattern in ['## 7.', '7.', 'recommendation', 'empfehlung', 'verdict']):
                 current_section = 'recommendation'
+                continue
             elif current_section:
-                sections[current_section] += line + '\n'
+                # Only add line if it's not a section header
+                if not line.strip().startswith('#'):
+                    sections[current_section] += line + '\n'
+
+        # Clean up sections - remove empty lines at start/end
+        for key in sections:
+            sections[key] = sections[key].strip()
 
         # Create summary if not present
         if not sections['summary']:
-            sections['summary'] = sections['recommendation'][:200] if sections['recommendation'] else 'Analysis completed'
+            # Use first 200 chars of recommendation or first paragraph
+            if sections['recommendation']:
+                sections['summary'] = sections['recommendation'][:200]
+            elif sections['technical_analysis']:
+                sections['summary'] = sections['technical_analysis'][:200]
+            else:
+                sections['summary'] = 'Analysis completed'
+
+        # Debug logging
+        logger.info(f"Parsed sections: {[(k, len(v)) for k, v in sections.items() if v]}")
 
         return sections
 
