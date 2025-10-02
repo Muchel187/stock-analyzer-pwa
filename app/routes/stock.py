@@ -247,18 +247,35 @@ def search_stocks():
         # For now, we'll check against known tickers
         from app.services.screener_service import ScreenerService
 
+        # Enhanced search with mock data fallback for better performance
+        from app.services.mock_data_service import MockDataService
+
         all_tickers = ScreenerService.US_STOCKS + ScreenerService.DAX_STOCKS
         matches = []
 
+        # First, try to find direct ticker matches without API calls
         for ticker in all_tickers:
             if query.upper() in ticker.upper():
-                stock_info = StockService.get_stock_info(ticker)
-                if stock_info:
+                # Try to get cached data first
+                from app.models import StockCache
+                cached = StockCache.get_cached(ticker, 'info')
+
+                if cached:
+                    # Use cached data
                     matches.append({
                         'ticker': ticker,
-                        'company_name': stock_info.get('company_name'),
-                        'exchange': stock_info.get('exchange'),
-                        'sector': stock_info.get('sector')
+                        'company_name': cached.get('company_name', ticker),
+                        'exchange': cached.get('exchange', 'NASDAQ'),
+                        'sector': cached.get('sector', 'Technology')
+                    })
+                else:
+                    # Use mock data for fast response (no API calls)
+                    mock_info = MockDataService.get_mock_stock_info(ticker)
+                    matches.append({
+                        'ticker': ticker,
+                        'company_name': mock_info.get('company_name'),
+                        'exchange': mock_info.get('exchange'),
+                        'sector': mock_info.get('sector')
                     })
 
                 if len(matches) >= 10:  # Limit results
