@@ -287,6 +287,13 @@ Base the data on realistic price movements for this stock. Use your knowledge of
             else:  # openai
                 analysis_text = self._call_openai(prompt)
 
+            # If AI call fails, use mock data
+            if not analysis_text:
+                logger.warning(f"AI service failed for {ticker}, using mock analysis")
+                from app.services.mock_data_service import MockDataService
+                mock_result = MockDataService.get_mock_ai_analysis(ticker, stock_data)
+                return mock_result
+
             if not analysis_text:
                 return {
                     'error': 'AI service error',

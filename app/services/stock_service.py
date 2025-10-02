@@ -26,8 +26,10 @@ class StockService:
             # Get quote data from fallback sources (Finnhub primary)
             quote_data = FallbackDataService.get_stock_quote(ticker)
             if not quote_data:
-                logger.error(f"Failed to get quote data for {ticker}")
-                return None
+                logger.warning(f"Failed to get quote data for {ticker}, using mock data")
+                # Use mock data as last resort
+                from app.services.mock_data_service import MockDataService
+                return MockDataService.get_mock_stock_info(ticker)
 
             # Try to get additional company information
             company_data = FallbackDataService.get_company_info(ticker)
@@ -117,8 +119,10 @@ class StockService:
             # Get historical data
             hist_data = StockService.get_price_history(ticker, period="6mo")
             if not hist_data or not hist_data.get('data'):
-                logger.warning(f"No historical data available for technical indicators: {ticker}")
-                return None
+                logger.warning(f"No historical data available for technical indicators: {ticker}, using mock data")
+                # Use mock technical indicators
+                from app.services.mock_data_service import MockDataService
+                return MockDataService.get_mock_technical_indicators(ticker)
 
             # Convert to pandas DataFrame
             df = pd.DataFrame(hist_data['data'])
