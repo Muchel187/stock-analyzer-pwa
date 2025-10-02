@@ -4,10 +4,107 @@ Alternative data sources for stock information when Yahoo Finance is unavailable
 import requests
 import os
 import logging
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, Tuple
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+
+# German Stock Ticker Mapping for Finnhub
+# Finnhub uses XETRA:TICKER format for German stocks
+GERMAN_TICKER_MAP = {
+    # DAX 40 stocks - mapping from .DE format to XETRA format
+    'SAP.DE': 'XETRA:SAP',
+    'SIE.DE': 'XETRA:SIE',
+    'BMW.DE': 'XETRA:BMW',
+    'BAS.DE': 'XETRA:BAS',
+    'DAI.DE': 'XETRA:DAI',
+    'ALV.DE': 'XETRA:ALV',
+    'BAYN.DE': 'XETRA:BAYN',
+    'ADS.DE': 'XETRA:ADS',
+    'DBK.DE': 'XETRA:DBK',
+    'DTE.DE': 'XETRA:DTE',
+    'ADS.DE': 'XETRA:ADS',
+    'AIR.DE': 'XETRA:AIR',
+    'BEI.DE': 'XETRA:BEI',
+    'CON.DE': 'XETRA:CON',
+    'DHL.DE': 'XETRA:DHL',
+    'EOAN.DE': 'XETRA:EOAN',
+    'FRE.DE': 'XETRA:FRE',
+    'HEI.DE': 'XETRA:HEI',
+    'HEN3.DE': 'XETRA:HEN3',
+    'IFX.DE': 'XETRA:IFX',
+    'LIN.DE': 'XETRA:LIN',
+    'MRK.DE': 'XETRA:MRK',
+    'MTX.DE': 'XETRA:MTX',
+    'MUV2.DE': 'XETRA:MUV2',
+    'PAH3.DE': 'XETRA:PAH3',
+    'PUM.DE': 'XETRA:PUM',
+    'RWE.DE': 'XETRA:RWE',
+    'SY1.DE': 'XETRA:SY1',
+    'VOW3.DE': 'XETRA:VOW3',
+    'VNA.DE': 'XETRA:VNA',
+    'ZAL.DE': 'XETRA:ZAL',
+    # MDAX stocks
+    'AFX.DE': 'XETRA:AFX',
+    'BC8.DE': 'XETRA:BC8',
+    'COP.DE': 'XETRA:COP',
+    'EVD.DE': 'XETRA:EVD',
+    'EVK.DE': 'XETRA:EVK',
+    'FIE.DE': 'XETRA:FIE',
+    'FME.DE': 'XETRA:FME',
+    'FPE.DE': 'XETRA:FPE',
+    'FRA.DE': 'XETRA:FRA',
+    'G1A.DE': 'XETRA:G1A',
+    'GXI.DE': 'XETRA:GXI',
+    'HNR1.DE': 'XETRA:HNR1',
+    'HOT.DE': 'XETRA:HOT',
+    'JUN3.DE': 'XETRA:JUN3',
+    'KGX.DE': 'XETRA:KGX',
+    'LEG.DE': 'XETRA:LEG',
+    'NDA.DE': 'XETRA:NDA',
+    'O2D.DE': 'XETRA:O2D',
+    'OSR.DE': 'XETRA:OSR',
+    'PFV.DE': 'XETRA:PFV',
+    'PSM.DE': 'XETRA:PSM',
+    'RAA.DE': 'XETRA:RAA',
+    'RHK.DE': 'XETRA:RHK',
+    'SAX.DE': 'XETRA:SAX',
+    'SDF.DE': 'XETRA:SDF',
+    'SHL.DE': 'XETRA:SHL',
+    'SIX2.DE': 'XETRA:SIX2',
+    'SRT.DE': 'XETRA:SRT',
+    'TKA.DE': 'XETRA:TKA',
+    'TLX.DE': 'XETRA:TLX',
+}
+
+
+def convert_ticker_for_api(ticker: str, api_name: str) -> Tuple[str, str]:
+    """
+    Convert ticker to API-specific format
+
+    Args:
+        ticker: Original ticker (e.g., 'SAP.DE', 'AAPL')
+        api_name: API name ('finnhub', 'twelve_data', 'alpha_vantage')
+
+    Returns:
+        Tuple of (converted_ticker, original_ticker)
+
+    Examples:
+        convert_ticker_for_api('SAP.DE', 'finnhub') -> ('XETRA:SAP', 'SAP.DE')
+        convert_ticker_for_api('AAPL', 'finnhub') -> ('AAPL', 'AAPL')
+    """
+    original_ticker = ticker
+
+    # Finnhub uses XETRA:TICKER format for German stocks
+    if api_name == 'finnhub' and ticker.endswith('.DE'):
+        converted = GERMAN_TICKER_MAP.get(ticker, ticker)
+        logger.debug(f"Converting ticker {ticker} to {converted} for Finnhub")
+        return converted, original_ticker
+
+    # Twelve Data and Alpha Vantage use .DE format
+    # No conversion needed
+    return ticker, original_ticker
 
 
 class AlphaVantageService:
@@ -163,15 +260,18 @@ class FinnhubService:
 
     @staticmethod
     def get_stock_quote(ticker: str) -> Optional[Dict[str, Any]]:
-        """Get real-time stock quote from Finnhub"""
+        """Get real-time stock quote from Finnhub with German stock support"""
         api_key = os.getenv('FINNHUB_API_KEY')
         if not api_key:
             logger.warning("Finnhub API key not configured")
             return None
 
         try:
+            # Convert ticker for Finnhub API (German stocks need XETRA: prefix)
+            api_ticker, original_ticker = convert_ticker_for_api(ticker, 'finnhub')
+
             params = {
-                'symbol': ticker.upper(),
+                'symbol': api_ticker.upper(),
                 'token': api_key
             }
 
@@ -180,11 +280,12 @@ class FinnhubService:
             data = response.json()
 
             if not data or data.get('c') == 0:
-                logger.warning(f"No data returned from Finnhub for {ticker}")
+                logger.warning(f"No data returned from Finnhub for {ticker} (API ticker: {api_ticker})")
                 return None
 
+            # Return with original ticker format
             return {
-                'ticker': ticker.upper(),
+                'ticker': original_ticker.upper(),
                 'current_price': float(data.get('c', 0)),  # Current price
                 'previous_close': float(data.get('pc', 0)),  # Previous close
                 'open': float(data.get('o', 0)),  # Open price
