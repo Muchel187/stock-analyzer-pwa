@@ -105,6 +105,19 @@ class HistoricalDataService:
                     'last_updated': local_data[0].updated_at.isoformat() if local_data else None
                 }
 
+            # Try to get ANY available data for this ticker (regardless of date)
+            any_data = HistoricalDataService._get_any_available_data(ticker)
+            if any_data:
+                logger.warning(f"[Historical] Returning ANY available cached data for {ticker} ({len(any_data)} points)")
+                return {
+                    'ticker': ticker,
+                    'period': period,
+                    'data': [price.to_dict() for price in any_data],
+                    'source': 'any_cache',
+                    'last_updated': any_data[0].updated_at.isoformat() if any_data else None,
+                    'warning': 'Data is from a different time period due to API limitations'
+                }
+
             # No data available at all
             logger.error(f"[Historical] No data available for {ticker}")
             return {
@@ -135,6 +148,13 @@ class HistoricalDataService:
                 HistoricalPrice.date <= end_date
             )
         ).order_by(HistoricalPrice.date.desc()).all()
+
+    @staticmethod
+    def _get_any_available_data(ticker: str, limit: int = 365) -> List[HistoricalPrice]:
+        """Get ANY available historical data for ticker, regardless of date range"""
+        return HistoricalPrice.query.filter_by(
+            ticker=ticker
+        ).order_by(HistoricalPrice.date.desc()).limit(limit).all()
 
     @staticmethod
     def _is_data_fresh(ticker: str, start_date: date, end_date: date) -> bool:
