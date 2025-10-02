@@ -598,27 +598,41 @@ class StockAnalyzerApp {
 
     // Stock Analysis
     async analyzeStock() {
+        console.log('analyzeStock called');
         const ticker = document.getElementById('stockSearch').value.trim();
+        console.log('Ticker:', ticker);
+        
         if (!ticker) {
             this.showNotification('Bitte geben Sie ein Symbol ein', 'error');
             return;
         }
 
         const resultDiv = document.getElementById('analysisResult');
+        if (!resultDiv) {
+            console.error('analysisResult element not found!');
+            this.showNotification('UI Fehler: Result container nicht gefunden', 'error');
+            return;
+        }
+        
         resultDiv.style.display = 'block';
         resultDiv.classList.add('loading');
 
         try {
+            console.log('Fetching stock data...');
             const [stockInfo, aiAnalysis] = await Promise.all([
                 api.getStock(ticker),
                 this.currentUser ? api.analyzeWithAI(ticker) : Promise.resolve(null)
             ]);
 
+            console.log('Stock data received:', stockInfo.ticker);
+            console.log('AI analysis:', aiAnalysis ? 'Present' : 'Not requested');
+            
             resultDiv.classList.remove('loading');
             this.displayStockAnalysis(stockInfo, aiAnalysis);
         } catch (error) {
+            console.error('analyzeStock error:', error);
             resultDiv.classList.remove('loading');
-            this.showNotification('Analyse fehlgeschlagen', 'error');
+            this.showNotification(`Analyse fehlgeschlagen: ${error.message}`, 'error');
             resultDiv.style.display = 'none';
         }
     }
