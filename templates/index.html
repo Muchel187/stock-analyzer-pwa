@@ -425,8 +425,10 @@
 
             <div class="analysis-container">
                 <div class="search-box card">
-                    <input type="text" id="stockSearch" class="search-input" placeholder="Symbol eingeben (z.B. AAPL, MSFT)...">
-                    <button class="btn btn-primary" onclick="app.analyzeStock()">Analysieren</button>
+                    <form id="stockSearchForm" style="display: flex; gap: 10px;">
+                        <input type="text" id="stockSearch" class="search-input" placeholder="Symbol eingeben (z.B. AAPL, MSFT, GME)..." required>
+                        <button type="submit" class="btn btn-primary">Analysieren</button>
+                    </form>
                 </div>
 
                 <div id="analysisResult" style="display:none;">

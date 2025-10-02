@@ -83,6 +83,13 @@ class StockAnalyzerApp {
             await this.handleRegister();
         });
 
+        // Stock search form (Analysis page)
+        const stockSearchForm = document.getElementById('stockSearchForm');
+        stockSearchForm?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await this.analyzeStock();
+        });
+
         // Screener form
         const screenerForm = document.getElementById('screenerForm');
         screenerForm?.addEventListener('submit', async (e) => {
@@ -244,6 +251,11 @@ class StockAnalyzerApp {
                 break;
             case 'alerts':
                 await this.loadAlerts();
+                break;
+            case 'analysis':
+                // Analysis page doesn't need initial data load
+                // It waits for user to enter a ticker
+                console.log('Analysis page ready for ticker input');
                 break;
         }
     }
