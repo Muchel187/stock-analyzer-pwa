@@ -16,20 +16,23 @@ class AIService:
 
         if self.google_api_key:
             self.provider = 'google'
+            self.provider_name = 'Google Gemini 2.5 Pro'
             # Using Gemini 2.5 Pro (October 2025 - production-ready, enhanced reasoning)
-            # Note: Gemini 2.5 Pro is available as of October 2025 with improved analysis capabilities
+            # Gemini 2.5 Pro offers superior analysis capabilities compared to Flash
             self.api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={self.google_api_key}"
             logger.info("Using Google Gemini 2.5 Pro for stock analysis")
         elif self.openai_api_key:
             self.provider = 'openai'
+            self.provider_name = 'OpenAI GPT-4'
             self.api_url = "https://api.openai.com/v1/chat/completions"
             self.headers = {
                 "Authorization": f"Bearer {self.openai_api_key}",
                 "Content-Type": "application/json"
             }
-            logger.info("Using OpenAI for stock analysis")
+            logger.info("Using OpenAI GPT-4 for stock analysis")
         else:
             self.provider = None
+            self.provider_name = 'None'
             logger.warning("No AI API key configured")
 
     def analyze_stock_with_ai(self, stock_data: Dict[str, Any],
@@ -68,6 +71,7 @@ class AIService:
                 'raw_analysis': analysis_text,
                 'confidence_score': self._calculate_confidence_score(stock_data, technical_indicators, fundamental_analysis),
                 'provider': self.provider,
+                'provider_name': self.provider_name,  # NEW: Human-readable name
                 'timestamp': None  # Will be set by the caller
             }
 
@@ -226,87 +230,171 @@ class AIService:
             short_info += f"DTC {short_data.get('days_to_cover', 'N/A')}"
             sections.append(f"Short Data: {short_info}")
         
-        # Build final comprehensive prompt
+        # Build final comprehensive prompt with strict formatting instructions
         prompt = f"""Analyze {ticker} ({company}) - Comprehensive Due Diligence Report:
 
 DATA:
 {chr(10).join(['- ' + s for s in sections])}
 
-PROVIDE DETAILED ANALYSIS IN THE FOLLOWING 7 SECTIONS (ALL REQUIRED):
+⚠️ CRITICAL INSTRUCTIONS:
+- You MUST provide ALL 7 sections below
+- Each section MUST contain substantial analysis (minimum 3-5 sentences)
+- Use section headers EXACTLY as shown: "## 1. TECHNICAL ANALYSIS", "## 2. FUNDAMENTAL ANALYSIS", etc.
+- Do NOT skip any section - write "Insufficient data" if data is missing, but provide the section
+
+PROVIDE DETAILED ANALYSIS IN THE FOLLOWING 7 SECTIONS (ALL MANDATORY):
 
 ## 1. TECHNICAL ANALYSIS
-- Current trend direction (bullish/bearish/neutral)
-- Key support and resistance levels
-- RSI interpretation (overbought/oversold?)
-- MACD signals and momentum
-- Optimal entry/exit points
-- Volume analysis
+- Current trend direction (bullish/bearish/neutral) with specific evidence
+- Key support and resistance levels (provide actual price levels if possible)
+- RSI interpretation (currently {technical_indicators.get('rsi', 'N/A')} - overbought/oversold?)
+- MACD signals and momentum direction
+- Optimal entry/exit points based on current technicals
+- Volume analysis and recent trading patterns
+- Summary: Overall technical outlook (Bullish/Neutral/Bearish)
 
 ## 2. FUNDAMENTAL ANALYSIS
-- Valuation assessment (undervalued/overvalued?)
-- Growth prospects and catalysts
-- Profitability and margins analysis
-- Balance sheet health
-- Comparison with analyst consensus (if available)
-- Quality of management and strategy
+- Valuation assessment (undervalued/fairly valued/overvalued?) - explain why
+- Revenue and earnings growth prospects
+- Profitability metrics (margins, ROE, ROA if available)
+- Balance sheet strength (debt levels, cash position)
+- Competitive position in industry
+- Management quality and strategic direction
+- Compare with analyst consensus if available: {stock_data.get('analyst_ratings', {}).get('total_analysts', 0)} analysts
+- Summary: Overall fundamental health (Strong/Average/Weak)
 
-## 3. KEY RISKS (HAUPTRISIKEN)
-List 3-5 specific major risks with detailed explanations:
-- Risk 1: [Specific risk with detailed explanation]
-- Risk 2: [Specific risk with detailed explanation]
-- Risk 3: [Specific risk with detailed explanation]
-- Risk 4: [Optional additional risk]
-- Risk 5: [Optional additional risk]
-Include: market risks, company-specific risks, sector headwinds, competitive threats
+## 3. KEY RISKS (HAUPTRISIKEN) ⚠️
+**You MUST list at least 3-5 specific risks with detailed explanations**
 
-## 4. OPPORTUNITIES (CHANCEN)
-List 3-5 specific growth opportunities with detailed explanations:
-- Opportunity 1: [Specific opportunity with detailed explanation]
-- Opportunity 2: [Specific opportunity with detailed explanation]
-- Opportunity 3: [Specific opportunity with detailed explanation]
-- Opportunity 4: [Optional additional opportunity]
-- Opportunity 5: [Optional additional opportunity]
-Include: growth catalysts, upcoming events, competitive advantages, market trends
+**Risk 1:** [Name of risk]
+- Detailed explanation of this risk (2-3 sentences minimum)
+- Potential impact on stock price
+- Likelihood: High/Medium/Low
 
-## 5. PRICE TARGET
-Provide 12-month price target: $XXX.XX
-Justification: [Explain valuation method (DCF, P/E multiple, etc.) and key assumptions]
-Upside/Downside: [Calculate exact percentage from current price ${stock_data.get('current_price', 'N/A')}]
-Target Range: [Provide low/high range: $XX - $XX]
+**Risk 2:** [Name of risk]
+- Detailed explanation (2-3 sentences minimum)
+- Potential impact
+- Likelihood: High/Medium/Low
 
-## 6. SHORT SQUEEZE POTENTIAL
-Score: XX/100 (Must provide numeric score)
+**Risk 3:** [Name of risk]
+- Detailed explanation (2-3 sentences minimum)
+- Potential impact
+- Likelihood: High/Medium/Low
 
-**Due Diligence Factors (provide ACTUAL DATA if available):**
-- Freefloat: [Provide percentage or state "Limited/Low/High"]
-- Short Interest: [Provide percentage of float, e.g., "25% of float"]
-- Days to Cover: [Provide number, e.g., "4.5 days"]
-- FTDs (Failure to Deliver): [State "Significant", "Moderate", "Low", or actual number]
-- Borrowing costs: [State "High", "Moderate", "Low" with percentage if known]
-- Volume spikes: [Describe recent trading activity]
-- Sentiment: [Social media/retail interest: Strong Bullish/Moderate/Bearish]
-- Options activity: [Mention any unusual activity]
+**Risk 4:** [Optional additional risk - add if relevant]
+**Risk 5:** [Optional additional risk - add if relevant]
 
-**Analysis Explanation:**
-Explain in 3-5 sentences WHY this score is justified. What specific factors make a squeeze LIKELY or UNLIKELY?
-Probability: [Choose ONE: EXTREM WAHRSCHEINLICH / WAHRSCHEINLICH / MÖGLICH / UNWAHRSCHEINLICH / SEHR UNWAHRSCHEINLICH]
-Reasoning: [Explain the probability assessment]
+Categories to consider: market risks, company-specific risks, sector headwinds, regulatory risks, competitive threats, financial risks
 
-## 7. RECOMMENDATION
-Clear verdict: **BUY** / **HOLD** / **SELL**
+## 4. OPPORTUNITIES (CHANCEN) 🚀
+**You MUST list at least 3-5 specific opportunities with detailed explanations**
 
-Reasoning: [Provide 4-6 sentences explaining the verdict with specific factors]
-- Key factor 1
-- Key factor 2
-- Key factor 3
+**Opportunity 1:** [Name of opportunity]
+- Detailed explanation of this growth catalyst (2-3 sentences minimum)
+- Potential positive impact on stock
+- Timeframe: Near-term/Medium-term/Long-term
 
-Confidence Level: [High/Medium/Low]
-Time Horizon: [Short-term (0-3 months) / Medium-term (3-12 months) / Long-term (1+ years)]
+**Opportunity 2:** [Name of opportunity]
+- Detailed explanation (2-3 sentences minimum)
+- Potential impact
+- Timeframe: Near-term/Medium-term/Long-term
 
-Compare your analysis with analyst consensus (if available) and explain any significant differences.
-Consider insider activity and news sentiment in your outlook.
+**Opportunity 3:** [Name of opportunity]
+- Detailed explanation (2-3 sentences minimum)
+- Potential impact
+- Timeframe: Near-term/Medium-term/Long-term
 
-IMPORTANT: You MUST provide ALL 7 sections. Do not skip any section. Use "N/A" or "Not available" if data is missing, but provide the section structure."""
+**Opportunity 4:** [Optional - add if relevant]
+**Opportunity 5:** [Optional - add if relevant]
+
+Categories to consider: growth catalysts, upcoming product launches, market expansion, M&A potential, regulatory changes, technological advantages, market trends
+
+## 5. PRICE TARGET 🎯
+**12-Month Price Target:** $XXX.XX (You MUST provide a specific number)
+
+**Current Price:** ${stock_data.get('current_price', 'N/A')}
+
+**Valuation Method:** [Explain which method you used: DCF, P/E multiple comparison, Sum-of-Parts, or combination]
+
+**Key Assumptions:**
+1. [List major assumption 1]
+2. [List major assumption 2]
+3. [List major assumption 3]
+
+**Upside/Downside:** Calculate and state: "+XX%" or "-XX%" from current price
+
+**Target Range:**
+- Bear Case: $XX.XX (pessimistic scenario)
+- Base Case: $XX.XX (most likely scenario)
+- Bull Case: $XX.XX (optimistic scenario)
+
+{f"**Analyst Consensus Target:** ${stock_data.get('price_target', {}).get('target_mean', 'N/A')} (Range: ${stock_data.get('price_target', {}).get('target_low', 'N/A')} - ${stock_data.get('price_target', {}).get('target_high', 'N/A')})" if stock_data.get('price_target') else ""}
+
+## 6. SHORT SQUEEZE POTENTIAL 🔥
+**Squeeze Score:** XX/100 (You MUST provide a specific number from 0-100)
+
+**Due Diligence Factors Analysis:**
+
+**Short Interest Data:**
+- **Freefloat:** {short_data.get('free_float', 'Estimated: Medium (40-60%)')}
+- **Short Interest:** {short_data.get('short_percent_of_float', 'Estimated: 5-15%')} of float
+- **Days to Cover (DTC):** {short_data.get('days_to_cover', 'Estimated: 2-4 days')}
+- **Shares Shorted:** {short_data.get('short_volume', 'Not available')}
+
+**Trading Dynamics:**
+- **FTDs (Failure to Deliver):** {short_data.get('ftd_level', 'Assessment: Moderate - requires monitoring')}
+- **Borrowing Costs:** {short_data.get('borrow_fee', 'Estimated: 2-5% annually (Moderate)')}
+- **Recent Volume Spikes:** {short_data.get('volume_trend', 'Analyze recent 20-day volume vs. 90-day average')}
+- **Options Activity:** {short_data.get('options_flow', 'Monitor for unusual call buying or put/call ratio changes')}
+
+**Sentiment & Catalysts:**
+- **Social Media Sentiment:** {news_sentiment.get('social_sentiment', 'Assess: Bullish/Neutral/Bearish based on Reddit, Twitter activity')}
+- **Retail Interest Level:** {news_sentiment.get('retail_interest', 'Gauge: High/Medium/Low')}
+- **Upcoming Catalysts:** List any earnings, product launches, or events that could trigger squeeze
+
+**Squeeze Analysis Explanation:**
+[Provide 4-6 sentences explaining WHY you assigned this score. What specific factors make a squeeze LIKELY or UNLIKELY? Consider: short interest level, freefloat size, recent price action, sentiment, and any ongoing short campaigns.]
+
+**Squeeze Probability Assessment:** 
+- **Verdict:** [Choose ONE and explain: EXTREM WAHRSCHEINLICH (80-100) / WAHRSCHEINLICH (60-79) / MÖGLICH (40-59) / UNWAHRSCHEINLICH (20-39) / SEHR UNWAHRSCHEINLICH (0-19)]
+
+**Reasoning for Probability:**
+[Explain in 2-3 sentences why you chose this probability level. What are the key deciding factors?]
+
+**Trigger Events to Watch:**
+1. [Event that could trigger squeeze]
+2. [Event that could trigger squeeze]
+3. [Event that could trigger squeeze]
+
+## 7. INVESTMENT RECOMMENDATION 📊
+**Verdict:** **[BUY / HOLD / SELL]** (You MUST choose one)
+
+**Reasoning:**
+[Provide 5-7 sentences explaining your verdict with specific factors. Reference key points from previous sections.]
+
+**Key Decision Factors:**
+1. **[Factor 1 name]:** [Explanation - why this supports your verdict]
+2. **[Factor 2 name]:** [Explanation - why this supports your verdict]
+3. **[Factor 3 name]:** [Explanation - why this supports your verdict]
+4. **[Factor 4 name]:** [Explanation - optional]
+
+**Confidence Level:** [High (80-100%) / Medium (50-79%) / Low (<50%)] - Explain why
+
+**Investment Time Horizon:** 
+- **Short-term (0-3 months):** [BUY/HOLD/SELL]
+- **Medium-term (3-12 months):** [BUY/HOLD/SELL]
+- **Long-term (1+ years):** [BUY/HOLD/SELL]
+
+{f"**Comparison with Analyst Consensus:** {stock_data.get('analyst_ratings', {}).get('total_analysts', 'N/A')} analysts - Your view vs. Wall Street" if stock_data.get('analyst_ratings') else ""}
+
+{f"**Insider Activity Signal:** {stock_data.get('insider_transactions', {}).get('signal', 'NEUTRAL').upper()} - Insiders have {'bought' if stock_data.get('insider_transactions', {}).get('net_shares', 0) > 0 else 'sold'} {abs(stock_data.get('insider_transactions', {}).get('net_shares', 0)):,} shares in last 6 months" if stock_data.get('insider_transactions') else ""}
+
+{f"**News Sentiment:** {news_sentiment.get('sentiment_percentages', {}).get('bullish_pct', 'N/A')}% bullish, {news_sentiment.get('sentiment_percentages', {}).get('bearish_pct', 'N/A')}% bearish - Consider in outlook" if news_sentiment and news_sentiment.get('article_count', 0) > 0 else ""}
+
+**Final Note:** [Summarize in 2-3 sentences your overall conviction and any important caveats]
+
+---
+⚠️ REMEMBER: ALL 7 SECTIONS MUST BE COMPLETED. This is a comprehensive analysis that investors rely on for decision-making."""
 
         return prompt
 
@@ -321,7 +409,7 @@ IMPORTANT: You MUST provide ALL 7 sections. Do not skip any section. Use "N/A" o
             'opportunities': '',
             'price_target': '',
             'short_squeeze': '',
-            'short_squeeze_details': {},  # NEW: Structured short squeeze data
+            'short_squeeze_details': {},  # Structured short squeeze data
             'recommendation': '',
             'summary': ''
         }
@@ -329,17 +417,28 @@ IMPORTANT: You MUST provide ALL 7 sections. Do not skip any section. Use "N/A" o
         current_section = None
         lines = response_text.split('\n')
         
-        # Extract short squeeze details using regex
+        # Extract short squeeze details using regex (case-insensitive)
         short_squeeze_patterns = {
-            'freefloat': r'freefloat[:\s]+([0-9.]+%?|limited|low|high)',
-            'short_interest': r'short\s+interest[:\s]+([0-9.]+%)',
-            'days_to_cover': r'days?\s+to\s+cover[:\s]+([0-9.]+)',
-            'ftd': r'ftds?[:\s]+(significant|high|low|moderate|none|[0-9,]+)',
-            'borrowing_cost': r'borrowing\s+cost[:\s]+([0-9.]+%|high|low|moderate)',
-            'volume_spike': r'volume\s+spike[:\s]+(yes|no|significant|moderate)',
-            'sentiment': r'sentiment[:\s]+(bullish|bearish|neutral|positive|negative)',
+            'freefloat': r'freefloat[:\s]+([0-9.]+%?|limited|low|medium|high|[\w\s]+%?)',
+            'short_interest': r'short\s+interest[:\s]+([0-9.]+%?[\w\s]*)',
+            'days_to_cover': r'days?\s+to\s+cover[:\s]+([0-9.]+[\w\s]*)',
+            'ftd': r'ftds?\s*\(failure to deliver\)[:\s]+([\w\s,]+)',
+            'borrowing_cost': r'borrowing\s+costs?[:\s]+([\w\s%\-.]+)',
+            'volume_spike': r'(?:volume\s+spikes?|recent\s+volume)[:\s]+([\w\s,\-.]+)',
+            'sentiment': r'(?:sentiment|social\s+media\s+sentiment)[:\s]+([\w\s\-/,]+)',
+            'squeeze_score': r'(?:squeeze\s+score|score)[:\s]+([0-9]{1,3})/100',
+            'squeeze_probability': r'probability[:\s]+([\w\s]+)',
         }
 
+        # First pass: Extract short squeeze details from entire text (case-insensitive)
+        text_lower = response_text.lower()
+        for key, pattern in short_squeeze_patterns.items():
+            match = re.search(pattern, text_lower, re.IGNORECASE)
+            if match:
+                sections['short_squeeze_details'][key] = match.group(1).strip()
+                logger.info(f"Extracted {key}: {match.group(1).strip()}")
+
+        # Second pass: Parse sections line by line
         for line in lines:
             line_lower = line.lower().strip()
             
@@ -352,51 +451,53 @@ IMPORTANT: You MUST provide ALL 7 sections. Do not skip any section. Use "N/A" o
             # Enhanced section detection with multiple pattern matching
             
             # Section 1: Technical Analysis
-            if re.search(r'(?:##\s*)?(?:1\.?|section\s+1)[:\s]*technical|^technical\s*analysis|^\*\*technical', line_lower):
+            if re.search(r'(?:##\s*)?(?:1\.?\s*|section\s+1)[:\s]*technical|^technical\s*analysis|^\*\*technical|^1\.\s*technical', line_lower):
                 current_section = 'technical_analysis'
+                logger.debug(f"Detected technical_analysis section at: {line[:50]}")
                 continue
             
             # Section 2: Fundamental Analysis
-            elif re.search(r'(?:##\s*)?(?:2\.?|section\s+2)[:\s]*fundamental|^fundamental\s*analysis|^\*\*fundamental', line_lower):
+            elif re.search(r'(?:##\s*)?(?:2\.?\s*|section\s+2)[:\s]*fundamental|^fundamental\s*analysis|^\*\*fundamental|^2\.\s*fundamental', line_lower):
                 current_section = 'fundamental_analysis'
+                logger.debug(f"Detected fundamental_analysis section at: {line[:50]}")
                 continue
             
-            # Section 3: Key Risks (Hauptrisiken)
-            elif re.search(r'(?:##\s*)?(?:3\.?|section\s+3)[:\s]*(?:key\s*)?risks|^hauptrisiken|^\*\*(?:key\s*)?risks', line_lower):
-                if 'squeeze' not in line_lower:  # Exclude "Short Squeeze" from risks
+            # Section 3: Key Risks (Hauptrisiken) - More specific pattern
+            elif re.search(r'(?:##\s*)?(?:3\.?\s*|section\s+3)[:\s]*(?:key\s*)?risks|^hauptrisiken|^\*\*(?:key\s*)?risks|^3\.\s*(?:key\s*)?risks|^key\s+risks\s*\(hauptrisiken\)', line_lower):
+                # Exclude "Short Squeeze" from risks section
+                if 'squeeze' not in line_lower:
                     current_section = 'risks'
+                    logger.debug(f"Detected risks section at: {line[:50]}")
                     continue
             
             # Section 4: Opportunities (Chancen)
-            elif re.search(r'(?:##\s*)?(?:4\.?|section\s+4)[:\s]*opportunit|^chancen|^growth\s+opportunit|^\*\*opportunit', line_lower):
+            elif re.search(r'(?:##\s*)?(?:4\.?\s*|section\s+4)[:\s]*opportunit|^chancen|^growth\s+opportunit|^\*\*opportunit|^4\.\s*opportunit|^opportunities\s*\(chancen\)', line_lower):
                 current_section = 'opportunities'
+                logger.debug(f"Detected opportunities section at: {line[:50]}")
                 continue
             
             # Section 5: Price Target (Kursziel)
-            elif re.search(r'(?:##\s*)?(?:5\.?|section\s+5)[:\s]*price\s*target|^kursziel|^target\s+price|^\*\*price\s*target', line_lower):
+            elif re.search(r'(?:##\s*)?(?:5\.?\s*|section\s+5)[:\s]*price\s*target|^kursziel|^target\s+price|^\*\*price\s*target|^5\.\s*price\s*target', line_lower):
                 current_section = 'price_target'
+                logger.debug(f"Detected price_target section at: {line[:50]}")
                 continue
             
             # Section 6: Short Squeeze
-            elif re.search(r'(?:##\s*)?(?:6\.?|section\s+6)[:\s]*short\s*squeeze|^squeeze\s*potential|^\*\*short\s*squeeze', line_lower):
+            elif re.search(r'(?:##\s*)?(?:6\.?\s*|section\s+6)[:\s]*short\s*squeeze|^squeeze\s*potential|^\*\*short\s*squeeze|^6\.\s*short\s*squeeze', line_lower):
                 current_section = 'short_squeeze'
+                logger.debug(f"Detected short_squeeze section at: {line[:50]}")
                 continue
             
             # Section 7: Recommendation
-            elif re.search(r'(?:##\s*)?(?:7\.?|section\s+7)[:\s]*recommendation|^empfehlung|^verdict|^investment\s+recommendation|^\*\*recommendation', line_lower):
+            elif re.search(r'(?:##\s*)?(?:7\.?\s*|section\s+7)[:\s]*(?:investment\s+)?recommendation|^empfehlung|^verdict|^\*\*recommendation|^7\.\s*(?:investment\s+)?recommendation', line_lower):
                 current_section = 'recommendation'
+                logger.debug(f"Detected recommendation section at: {line[:50]}")
                 continue
-            
-            # Extract short squeeze details from any line
-            for key, pattern in short_squeeze_patterns.items():
-                match = re.search(pattern, line_lower)
-                if match:
-                    sections['short_squeeze_details'][key] = match.group(1)
             
             # Add content to current section
             if current_section:
-                # Don't add markdown headers or section titles
-                if not line.strip().startswith('##') and not line.strip().startswith('#') and not line.strip().startswith('**Section'):
+                # Don't add markdown headers or section titles to content
+                if not re.match(r'^##\s*\d+\.?\s*', line.strip()) and not line.strip().startswith('#') and not line.strip().startswith('**Section'):
                     sections[current_section] += line + '\n'
 
         # Clean up sections - remove empty lines at start/end
@@ -408,19 +509,27 @@ IMPORTANT: You MUST provide ALL 7 sections. Do not skip any section. Use "N/A" o
         if not sections['summary']:
             # Use first 200 chars of recommendation or first paragraph
             if sections['recommendation']:
-                sections['summary'] = sections['recommendation'][:200]
+                sections['summary'] = sections['recommendation'][:200] + '...'
             elif sections['technical_analysis']:
-                sections['summary'] = sections['technical_analysis'][:200]
+                sections['summary'] = sections['technical_analysis'][:200] + '...'
             else:
-                sections['summary'] = 'Analysis completed'
+                sections['summary'] = 'Analysis completed. Review all sections for detailed insights.'
 
-        # Debug logging - show what was found
-        logger.info(f"Parsed sections with content: {[(k, len(v) if isinstance(v, str) else len(v)) for k, v in sections.items() if v]}")
+        # Debug logging - show what was parsed
+        for section_name, content in sections.items():
+            if isinstance(content, str):
+                content_length = len(content)
+                logger.info(f"Section '{section_name}': {content_length} chars")
+                if content_length < 50 and content:
+                    logger.warning(f"Section '{section_name}' is very short: {content[:100]}")
+            elif isinstance(content, dict):
+                logger.info(f"Section '{section_name}' details: {len(content)} items")
         
-        # Log if key sections are missing
-        for key_section in ['risks', 'opportunities', 'price_target', 'recommendation']:
-            if not sections[key_section]:
-                logger.warning(f"Section '{key_section}' is EMPTY - AI response may be incomplete")
+        # Log if key sections are missing or empty
+        critical_sections = ['technical_analysis', 'fundamental_analysis', 'risks', 'opportunities', 'price_target', 'recommendation']
+        for key_section in critical_sections:
+            if not sections[key_section] or len(sections[key_section]) < 50:
+                logger.error(f"⚠️ CRITICAL: Section '{key_section}' is EMPTY or TOO SHORT - AI response incomplete!")
 
         return sections
 
