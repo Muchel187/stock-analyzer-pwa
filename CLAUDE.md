@@ -88,14 +88,30 @@ The app uses Flask's application factory pattern in `app/__init__.py`:
 
 ### AI Analysis System
 
+**CURRENT MODEL (October 2025)**: Google Gemini 2.5 Pro
+
 **Dual Provider Support** (`app/services/ai_service.py`):
-- **Google Gemini 2.5 Flash** (preferred) - Configured via `GOOGLE_API_KEY`
+- **Google Gemini 2.5 Pro** (preferred) - Configured via `GOOGLE_API_KEY`
+  - Model: `gemini-2.0-flash-exp` (Latest experimental model as of Oct 2025)
+  - Superior analysis quality, longer context window
+  - Enhanced reasoning for complex financial analysis
 - **OpenAI GPT-4** (fallback) - Configured via `OPENAI_API_KEY`
+  - Used only if Gemini API key not available
 
 **Provider Selection:**
-- Checks for `GOOGLE_API_KEY` first, uses Gemini if available
+- Checks for `GOOGLE_API_KEY` first, uses Gemini 2.5 Pro if available
 - Falls back to OpenAI if only `OPENAI_API_KEY` is set
 - Logs which provider is being used on initialization
+
+**Phase 1 AI Enhancements (October 2025):**
+- ✅ **Analyst Ratings Integration**: AI compares its analysis with professional analyst consensus
+- ✅ **Insider Transaction Analysis**: AI evaluates management confidence through insider buying/selling
+- ✅ **News Sentiment Integration**: AI incorporates aggregated sentiment from latest news
+- ✅ **Enhanced Short Squeeze Analysis**: Real-time short interest, days to cover, FTD data
+- ✅ **Peer Group Comparison**: AI identifies and compares top 3-5 competitors
+- ✅ **Scenario Analysis**: Best-case, base-case, worst-case projections with price targets
+- ✅ **Moat Analysis**: Competitive advantages evaluation (brand, patents, network effects)
+- ✅ **Management Quality Assessment**: Leadership evaluation with scoring
 
 **AI Response Structure:**
 - Prompts explicitly request: Technical Analysis, Fundamental Analysis, Risks, Opportunities, **Price Target**, **Short Squeeze Potential**, and Recommendation
@@ -394,6 +410,53 @@ StockCache - Global cache table (not user-specific)
 - `PUT /api/auth/profile` - Update profile
 
 ## Known Issues & Solutions
+
+### CRITICAL ISSUES (October 2, 2025) ⚠️
+
+#### 1. Stock Analysis Search Error
+**Status:** ACTIVE BUG - Critical functionality broken
+**Symptom:** When searching for a stock and clicking "Analysieren", immediate error occurs
+**Error:** Browser console shows API errors, analysis page fails to load
+**Location:** `app.js` - `searchStock()` and `displayStockAnalysis()` methods
+**Impact:** Users cannot analyze any stocks - PRIMARY FEATURE BROKEN
+**Priority:** P0 - Must fix immediately
+
+#### 2. Portfolio Not Loading Stocks
+**Status:** ACTIVE BUG - Portfolio functionality broken
+**Symptom:** Added stocks don't appear in portfolio widget on dashboard
+**Error:** Portfolio shows empty or doesn't load transaction data
+**Location:** `app/routes/portfolio.py`, `static/js/app.js` - `loadPortfolioItems()`
+**Impact:** Users cannot see their portfolio holdings
+**Priority:** P0 - Must fix immediately
+
+#### 3. Stock Comparison Chart Error
+**Status:** ACTIVE BUG - Comparison feature broken
+**Symptom:** TypeError when trying to compare stocks
+**Error:** Browser console shows "Cannot read property 'data' of undefined"
+**Location:** `static/js/app.js` - `renderComparisonChart()` method
+**Impact:** Stock comparison feature unusable
+**Priority:** P1 - Fix after P0 issues
+
+#### 4. AI Analysis Missing Data
+**Status:** ACTIVE BUG - AI features incomplete
+**Symptoms:**
+- Technical analysis section empty/not loading
+- Opportunities and Risks sections missing
+- Due diligence factors for short squeeze not displaying properly (need: Free Float %, Short Quote %, FTD data)
+- Price target missing from general recommendation
+**Location:** `app/services/ai_service.py`, `static/js/ai-analysis.js`
+**Impact:** AI analysis incomplete, missing critical information
+**Priority:** P1 - Fix after P0 issues
+
+#### 5. AI Model Not Updated
+**Status:** CONFIGURATION ERROR
+**Symptom:** AI still shows "OpenAI GPT-4" instead of "Google Gemini 2.5 Pro"
+**Expected:** Should use Gemini 2.5 Pro model `gemini-2.0-flash-exp`
+**Location:** `app/services/ai_service.py` - Model name not updated
+**Impact:** Using outdated AI model
+**Priority:** P1 - Fix after P0 issues
+
+### RESOLVED ISSUES ✅
 
 ### Yahoo Finance Rate Limiting
 **Status:** RESOLVED - Yahoo Finance completely removed from codebase
@@ -2054,7 +2117,7 @@ Phase 4 establishes a robust testing and quality assurance framework for the Sto
 - Finnhub (Stock data)
 - Twelve Data (Historical data)
 - Alpha Vantage (Fundamentals, News)
-- Google Gemini 2.5 Flash (AI analysis)
+- **Google Gemini 2.5 Pro** (AI analysis - Latest model Oct 2025)
 - OpenAI GPT-4 (AI fallback)
 
 **Deployment:**
@@ -2069,7 +2132,7 @@ Phase 4 establishes a robust testing and quality assurance framework for the Sto
 - ✅ API response: < 2 seconds
 - ✅ AI recommendations: 2.9s (was 2-5 minutes)
 - ✅ Chart rendering: < 500ms
-- ✅ 87.5% test coverage
+- ⚠️ Test coverage: 87.5% (some tests failing due to recent changes)
 
 ### Security Achievements
 
@@ -2081,15 +2144,71 @@ Phase 4 establishes a robust testing and quality assurance framework for the Sto
 - ✅ XSS prevention
 - ✅ HTTPS enforced
 
-### Quality Achievements
+### Quality Status (October 2, 2025)
 
-- ✅ 56/64 unit tests passing
-- ✅ 4 comprehensive testing workflows
-- ✅ All critical bugs fixed
-- ✅ Performance benchmarks met
-- ✅ Security validation complete
-- ✅ Mobile responsive
-- ✅ Cross-browser compatible
+**Current State:**
+- ⚠️ **CRITICAL BUGS IDENTIFIED** - See "Known Issues" section above
+- ⚠️ Stock analysis search broken (P0)
+- ⚠️ Portfolio not loading (P0)
+- ⚠️ Stock comparison error (P1)
+- ⚠️ AI analysis incomplete (P1)
+- 56/64 unit tests passing (some failures due to Phase 1 changes)
+- Need comprehensive debugging session
+- Mobile responsive ✅
+- Cross-browser compatible ✅
+
+### Current Development Phase (October 2025)
+
+**Phase 1: AI Enhancement - IN PROGRESS** 🔧
+
+**Completed:**
+- ✅ Analyst ratings integration backend
+- ✅ Insider transaction data integration
+- ✅ News sentiment aggregation
+- ✅ Enhanced AI prompts with new data
+- ✅ Gemini 2.5 Pro model update (attempted)
+
+**Known Issues:**
+- ❌ Stock search/analysis broken after changes
+- ❌ Portfolio loading issue
+- ❌ AI model not reflecting correctly
+- ❌ Missing AI response sections (risks, opportunities, due diligence)
+- ❌ Price target not showing in recommendation
+
+**Next Steps:**
+1. **URGENT:** Fix critical P0 bugs (stock search, portfolio)
+2. Complete debugging of all broken features
+3. Verify AI model is using Gemini 2.5 Pro
+4. Fix AI response parsing for all sections
+5. Run comprehensive test suite
+6. Then proceed with Phase 2 (Visual Enhancements)
+
+### Planned Enhancements (Phase 2 & 3)
+
+**Phase 2: Visual Innovations** (Paused until bugs fixed)
+- KI-Prognose Chart (current price vs AI target)
+- Peer-Group Comparison Radar Chart
+- Interactive Scenario Analysis (Best/Base/Worst case)
+- Enhanced Short Squeeze visualization with real data
+
+**Phase 3: Deep Analysis Features** (Planned)
+- Detailed Moat Analysis visualization
+- Management Quality Scorecard
+- Enhanced Due Diligence display
+- Real-time short interest data integration
+
+### Testing & Debugging Plan
+
+**Immediate Actions Required:**
+1. Create comprehensive debug plan document
+2. Test all API endpoints with curl/Postman
+3. Check browser console for JavaScript errors
+4. Verify database migrations applied correctly
+5. Test authentication flow
+6. Test each feature individually
+7. Fix issues one by one
+8. Run unit tests after each fix
+9. Document all changes
 
 ### Next Steps (Future Enhancements)
 
@@ -2120,6 +2239,147 @@ Phase 4 establishes a robust testing and quality assurance framework for the Sto
 - Export to Excel/PDF
 - Email reports
 - Integration with brokers (TD Ameritrade, Interactive Brokers)
+
+---
+
+## CRITICAL DEVELOPMENT NOTES (October 2, 2025)
+
+### Before Making Any Changes:
+
+1. **ALWAYS check git status first**: `git status`
+2. **ALWAYS read error messages carefully**: Browser console + Flask logs
+3. **ALWAYS test incrementally**: Make small changes, test immediately
+4. **ALWAYS backup before major changes**: `git commit -am "checkpoint"`
+5. **NEVER delete working code without testing**: Comment out first
+
+### Current Priority Order:
+
+**P0 - CRITICAL (Fix First):**
+1. Stock analysis search functionality
+2. Portfolio loading issue
+
+**P1 - HIGH (Fix Second):**
+1. Stock comparison chart error
+2. AI analysis missing sections
+3. AI model display incorrect
+4. Due diligence display for short squeeze
+
+**P2 - MEDIUM (Fix Later):**
+1. Optimize test coverage
+2. Update documentation
+3. Performance improvements
+
+### Debugging Strategy:
+
+**For Stock Analysis Error:**
+1. Check browser console for exact error message
+2. Check Flask logs: `tail -f flask.log`
+3. Test API endpoint directly: `curl http://localhost:5000/api/stock/AAPL`
+4. Check `app.js` - `searchStock()` method
+5. Check `app/routes/stock.py` - `/api/stock/<ticker>` endpoint
+6. Verify JWT token is being sent correctly
+
+**For Portfolio Loading Issue:**
+1. Check if transactions are in database: Query Portfolio/Transaction tables
+2. Test API endpoint: `curl -H "Authorization: Bearer $TOKEN" http://localhost:5000/api/portfolio/`
+3. Check browser console for API errors
+4. Check `app.js` - `loadPortfolioItems()` method
+5. Check `app/routes/portfolio.py` - `/api/portfolio/` endpoint
+
+**For AI Analysis Issues:**
+1. Test AI endpoint directly with curl
+2. Check exact response from AI model
+3. Verify parsing logic in `_parse_ai_response()`
+4. Check if all sections are being extracted correctly
+5. Verify prompt includes all required sections
+
+### Key Files to Check:
+
+**Backend:**
+- `app/services/ai_service.py` - AI model and prompts
+- `app/services/stock_service.py` - Stock data retrieval
+- `app/routes/stock.py` - Stock API endpoints
+- `app/routes/portfolio.py` - Portfolio API endpoints
+- `config.py` - Configuration and API keys
+
+**Frontend:**
+- `static/js/app.js` - Main application logic
+- `static/js/ai-analysis.js` - AI visualization
+- `static/js/api.js` - API client methods
+- `templates/index.html` - Dashboard
+- `templates/analysis.html` - Stock analysis page
+
+**Database:**
+- Check migrations: `flask db current`
+- Check if all tables exist: `python check_database.py`
+- Check for data: Query tables directly
+
+### Environment Variables Required:
+
+```bash
+# API Keys (at least one from each category)
+FINNHUB_API_KEY=xxx
+TWELVE_DATA_API_KEY=xxx
+ALPHA_VANTAGE_API_KEY=xxx
+
+# AI (at least one required)
+GOOGLE_API_KEY=xxx  # For Gemini 2.5 Pro
+OPENAI_API_KEY=xxx  # Fallback
+
+# Flask
+SECRET_KEY=xxx
+JWT_SECRET_KEY=xxx
+FLASK_ENV=development
+DATABASE_URL=sqlite:///stockanalyzer.db
+```
+
+### Support & Maintenance
+
+**Documentation:**
+- `README.md` - User guide and setup instructions
+- `CLAUDE.md` - Developer guide (this file)
+- `PHASE4_TESTING_PLAN.md` - Comprehensive testing documentation
+- `PHASE3_4_ENHANCED_PLAN.md` - Enhanced roadmap
+- `AI_SETUP.md` - AI provider setup guide
+- `AI_VISUAL_ANALYSIS.md` - Visual AI system documentation
+- `OPTIMIZATION_PLAN.md` - Performance optimization strategies
+- `COMPREHENSIVE_DEBUG_PLAN.md` - Debugging guide (create this next)
+
+**Deployment:**
+- Render.com: https://aktieninspektor.onrender.com
+- GitHub: https://github.com/Muchel187/stock-analyzer-pwa
+- Auto-deploy on push to main branch
+
+**Monitoring:**
+- Check logs: Render dashboard
+- Test endpoints: `curl` commands
+- Health check: `/api/health`
+
+**Updates:**
+- Pull latest: `git pull origin main`
+- Install dependencies: `pip install -r requirements.txt`
+- Run migrations: `flask db upgrade`
+- Restart server: `python app.py`
+
+---
+
+**Last Updated:** October 2, 2025 at 12:00 CET
+**Version:** 1.1.0 (Phase 1 AI Enhancement - In Progress)
+**Status:** 🔧 DEBUGGING REQUIRED - Critical bugs identified
+**All Phases:** Phase 1-4 Complete, Phase 5 In Progress, Multiple P0 Bugs
+
+---
+
+## REMEMBER:
+
+1. **Fix bugs before adding features**
+2. **Test before committing**
+3. **Document all changes**
+4. **Keep CLAUDE.md updated**
+5. **One issue at a time**
+6. **Git commit frequently**
+
+---
 
 ### Support & Maintenance
 
