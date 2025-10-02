@@ -16,8 +16,9 @@ class AIService:
 
         if self.google_api_key:
             self.provider = 'google'
-            self.api_url = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key={self.google_api_key}"
-            logger.info("Using Google Gemini AI for stock analysis")
+            # Using gemini-pro-latest which is Gemini 2.5 Pro for deepest analysis
+            self.api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-latest:generateContent?key={self.google_api_key}"
+            logger.info("Using Google Gemini Pro (2.5 Pro) for stock analysis")
         elif self.openai_api_key:
             self.provider = 'openai'
             self.api_url = "https://api.openai.com/v1/chat/completions"
@@ -89,7 +90,7 @@ class AIService:
                 }],
                 "generationConfig": {
                     "temperature": 0.3,
-                    "maxOutputTokens": 2048,
+                    "maxOutputTokens": 8192,  # Increased from 2048 for comprehensive analysis
                 }
             }
 
@@ -97,13 +98,37 @@ class AIService:
 
             if response.status_code == 200:
                 result = response.json()
-                return result['candidates'][0]['content']['parts'][0]['text']
+                
+                # Enhanced error handling for different response formats
+                if 'candidates' in result and len(result['candidates']) > 0:
+                    candidate = result['candidates'][0]
+                    
+                    if 'content' in candidate:
+                        content = candidate['content']
+                        
+                        # Check for parts
+                        if 'parts' in content and len(content['parts']) > 0:
+                            if 'text' in content['parts'][0]:
+                                return content['parts'][0]['text']
+                            else:
+                                logger.error(f"No 'text' in parts: {content['parts'][0]}")
+                        else:
+                            logger.error(f"No 'parts' in content. Content keys: {content.keys()}")
+                            logger.error(f"Full content: {content}")
+                    else:
+                        logger.error(f"No 'content' in candidate. Candidate keys: {candidate.keys()}")
+                else:
+                    logger.error(f"No candidates in result. Result keys: {result.keys()}")
+                
+                return None
             else:
                 logger.error(f"Google Gemini API error: {response.status_code} - {response.text}")
                 return None
 
         except Exception as e:
             logger.error(f"Error calling Google Gemini: {str(e)}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return None
 
     def _call_openai(self, prompt: str) -> Optional[str]:
