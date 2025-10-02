@@ -176,30 +176,56 @@ class AIAnalysisVisualizer {
      * Extract price target from AI response
      */
     extractPriceTarget(data) {
+        console.log('[AI] Extracting price target from data');
+        
         const rawText = data.raw_analysis || '';
         const priceTargetSection = data.ai_analysis?.price_target || '';
-        const fullText = `${rawText} ${priceTargetSection}`;
+        const recommendation = data.ai_analysis?.recommendation || '';
+        const fullText = `${rawText} ${priceTargetSection} ${recommendation}`;
+
+        console.log('[AI] Searching in text length:', fullText.length);
 
         // Try to extract price target using various patterns
-        // Pattern 1: $XXX or $XX.XX
-        const dollarPattern = /\$(\d+(?:\.\d{2})?)/g;
-        const matches = [...fullText.matchAll(dollarPattern)];
-
-        // Pattern 2: "target of XXX" or "target: XXX"
-        const targetPattern = /(?:target|kursziel).*?(\d+(?:\.\d{2})?)/i;
-        const targetMatch = fullText.match(targetPattern);
+        const patterns = [
+            // Pattern 1: "target of $XXX" or "target: $XXX"
+            /(?:target|kursziel).*?\$(\d+(?:\.\d{1,2})?)/i,
+            // Pattern 2: "price target $XXX"
+            /price\s+target.*?\$(\d+(?:\.\d{1,2})?)/i,
+            // Pattern 3: "fair value $XXX"
+            /fair\s+value.*?\$(\d+(?:\.\d{1,2})?)/i,
+            // Pattern 4: "target price of XXX"
+            /target\s+price\s+of\s+(\d+(?:\.\d{1,2})?)/i,
+            // Pattern 5: Just "Kursziel: XXX"
+            /kursziel.*?(\d+(?:\.\d{1,2})?)/i,
+            // Pattern 6: "$XXX target"
+            /\$(\d+(?:\.\d{1,2})?)\s+target/i
+        ];
 
         let targetValue = null;
 
-        if (targetMatch) {
-            targetValue = parseFloat(targetMatch[1]);
-        } else if (matches.length > 0) {
-            // Find the most reasonable target (usually mentioned in price target section)
-            const priceTargetLower = priceTargetSection.toLowerCase();
-            if (priceTargetLower) {
-                const targetInSection = [...priceTargetLower.matchAll(dollarPattern)];
-                if (targetInSection.length > 0) {
-                    targetValue = parseFloat(targetInSection[0][1]);
+        // Try each pattern
+        for (const pattern of patterns) {
+            const match = fullText.match(pattern);
+            if (match) {
+                targetValue = parseFloat(match[1]);
+                console.log('[AI] Price target found with pattern:', pattern, '→', targetValue);
+                break;
+            }
+        }
+
+        // Fallback: look for reasonable price values in price_target section
+        if (!targetValue && priceTargetSection) {
+            const dollarPattern = /\$(\d+(?:\.\d{1,2})?)/g;
+            const matches = [...priceTargetSection.matchAll(dollarPattern)];
+            if (matches.length > 0) {
+                // Take the first reasonable value (between $1 and $10000)
+                for (const match of matches) {
+                    const val = parseFloat(match[1]);
+                    if (val >= 1 && val <= 10000) {
+                        targetValue = val;
+                        console.log('[AI] Price target found in section:', targetValue);
+                        break;
+                    }
                 }
             }
         }
@@ -208,12 +234,16 @@ class AIAnalysisVisualizer {
         let upside = 0;
         if (targetValue && data.current_price) {
             upside = ((targetValue - data.current_price) / data.current_price * 100).toFixed(1);
+            console.log('[AI] Calculated upside:', upside, '% (current:', data.current_price, ', target:', targetValue, ')');
         }
 
-        return {
+        const result = {
             value: targetValue ? targetValue.toFixed(2) : null,
             upside: parseFloat(upside)
         };
+
+        console.log('[AI] Price target result:', result);
+        return result;
     }
 
     /**
@@ -273,6 +303,7 @@ class AIAnalysisVisualizer {
         }
 
         const flameLevel = this.getFlameLevel(squeezeScore);
+        const explanation = this.generateSqueezeExplanation(squeezeScore, shortSqueezeText);
 
         return `
             <div class="short-squeeze-card">
@@ -290,14 +321,25 @@ class AIAnalysisVisualizer {
                     </div>
                 </div>
 
+                <!-- Probability Explanation -->
+                <div class="squeeze-explanation">
+                    <div class="explanation-header">
+                        <span class="explanation-icon">💡</span>
+                        <strong>Wahrscheinlichkeit & Einschätzung:</strong>
+                    </div>
+                    <div class="explanation-text">
+                        ${explanation}
+                    </div>
+                </div>
+
                 <div class="squeeze-analysis">
                     <div class="squeeze-factors">
-                        <h5>Due Diligence Faktoren:</h5>
+                        <h5>📊 Due Diligence Faktoren:</h5>
                         ${this.extractSqueezeFactors(shortSqueezeText)}
                     </div>
                     <div class="squeeze-details">
                         <button class="details-btn" onclick="this.parentElement.parentElement.classList.toggle('expanded')">
-                            <span>Details anzeigen</span>
+                            <span>Vollständige Analyse anzeigen</span>
                             <span class="expand-icon">▼</span>
                         </button>
                         <div class="squeeze-full-text">
@@ -373,67 +415,246 @@ class AIAnalysisVisualizer {
     }
 
     /**
+     * Generate squeeze probability explanation
+     */
+    generateSqueezeExplanation(score, text) {
+        let probability = '';
+        let reasoning = '';
+
+        if (score >= 80) {
+            probability = '🔴 <strong>EXTREM WAHRSCHEINLICH</strong>';
+            reasoning = 'Alle Indikatoren deuten auf ein sehr hohes Short Squeeze Potenzial hin. Die Kombination aus hohem Short Interest, begrenztem Float und starkem Kaufdruck schafft optimale Bedingungen.';
+        } else if (score >= 60) {
+            probability = '🟠 <strong>WAHRSCHEINLICH</strong>';
+            reasoning = 'Die meisten Faktoren unterstützen ein Short Squeeze Szenario. Short Interest und Float-Situation sind günstig, jedoch sollten Katalysatoren und Volumen beobachtet werden.';
+        } else if (score >= 40) {
+            probability = '🟡 <strong>MÖGLICH</strong>';
+            reasoning = 'Ein Short Squeeze ist möglich, aber nicht garantiert. Einige Faktoren sind positiv, andere neutral. Es bedarf zusätzlicher Katalysatoren oder erhöhtem Kaufdruck.';
+        } else if (score >= 20) {
+            probability = '🔵 <strong>UNWAHRSCHEINLICH</strong>';
+            reasoning = 'Die Bedingungen für einen Short Squeeze sind aktuell nicht optimal. Short Interest oder Float-Verfügbarkeit sind nicht ausreichend, oder es fehlt an Momentum.';
+        } else {
+            probability = '⚪ <strong>SEHR UNWAHRSCHEINLICH</strong>';
+            reasoning = 'Ein Short Squeeze ist unter den aktuellen Bedingungen sehr unwahrscheinlich. Die fundamentalen Voraussetzungen (Short Interest, Float, Volumen) sind nicht gegeben.';
+        }
+
+        // Extract specific reasons from text if available
+        let specificReasons = '';
+        if (text.toLowerCase().includes('warum') || text.toLowerCase().includes('because') || text.toLowerCase().includes('da ')) {
+            const reasonMatch = text.match(/(?:warum|because|da\s+)(.*?)(?:\.|$)/i);
+            if (reasonMatch && reasonMatch[1]) {
+                specificReasons = `<br><br><em>Spezifische Gründe:</em> ${reasonMatch[1].trim()}`;
+            }
+        }
+
+        return `
+            <div class="probability-statement">${probability}</div>
+            <div class="reasoning-text">${reasoning}${specificReasons}</div>
+        `;
+    }
+
+    /**
      * Extract squeeze factors from text
      */
     extractSqueezeFactors(text) {
+        console.log('[AI] Extracting squeeze factors from text length:', text?.length);
         const factors = [];
 
-        // Check for specific factors mentioned
-        if (text.toLowerCase().includes('short interest') || text.toLowerCase().includes('short %')) {
-            const match = text.match(/short\s+interest.*?(\d+\.?\d*)%/i);
-            if (match) {
+        // FREEFLOAT / FLOAT
+        if (text.toLowerCase().includes('float') || text.toLowerCase().includes('freefloat')) {
+            const floatMatch = text.match(/(?:free\s*)?float.*?(\d+(?:\.\d+)?)\s*(?:%|prozent|percent|million|m\b)/i);
+            if (floatMatch) {
+                const floatValue = floatMatch[1];
+                const isPercentage = /(%|prozent|percent)/.test(floatMatch[0]);
+                const isMillion = /(million|m\b)/i.test(floatMatch[0]);
+                
+                factors.push({
+                    icon: '🏦',
+                    label: 'Freefloat',
+                    value: isPercentage ? `${floatValue}%` : isMillion ? `${floatValue}M Aktien` : floatValue,
+                    status: isPercentage && parseFloat(floatValue) < 50 ? 'high' : 'normal',
+                    description: 'Verfügbare handelbare Aktien'
+                });
+            } else if (text.toLowerCase().includes('float')) {
+                factors.push({
+                    icon: '🏦',
+                    label: 'Freefloat',
+                    value: 'Begrenzt',
+                    status: 'high',
+                    description: 'Niedriger Float erhöht Squeeze-Potenzial'
+                });
+            }
+        }
+
+        // SHORT INTEREST / SHORT QUOTE
+        if (text.toLowerCase().includes('short interest') || text.toLowerCase().includes('short %') || text.toLowerCase().includes('shortquote')) {
+            const shortMatch = text.match(/short\s+(?:interest|quote|%).*?(\d+(?:\.\d+)?)\s*%/i);
+            if (shortMatch) {
+                const shortValue = parseFloat(shortMatch[1]);
                 factors.push({
                     icon: '📊',
                     label: 'Short Interest',
-                    value: match[1] + '%',
-                    status: parseFloat(match[1]) > 20 ? 'high' : 'normal'
+                    value: `${shortValue}%`,
+                    status: shortValue > 20 ? 'high' : shortValue > 10 ? 'moderate' : 'normal',
+                    description: shortValue > 30 ? 'Extrem hoch!' : shortValue > 20 ? 'Sehr hoch' : shortValue > 10 ? 'Erhöht' : 'Normal'
                 });
+            } else if (text.toLowerCase().includes('short')) {
+                // Try to find any percentage near "short"
+                const nearbyPercent = text.match(/short.*?(\d+(?:\.\d+)?)\s*(?:%|prozent)/i);
+                if (nearbyPercent) {
+                    factors.push({
+                        icon: '📊',
+                        label: 'Short Interest',
+                        value: `${nearbyPercent[1]}%`,
+                        status: parseFloat(nearbyPercent[1]) > 20 ? 'high' : 'normal',
+                        description: 'Anteil leerverkaufter Aktien'
+                    });
+                } else {
+                    factors.push({
+                        icon: '📊',
+                        label: 'Short Interest',
+                        value: 'Erhöht',
+                        status: 'high',
+                        description: 'Signifikantes Short Interest vorhanden'
+                    });
+                }
             }
         }
 
-        if (text.toLowerCase().includes('days to cover')) {
-            const match = text.match(/days\s+to\s+cover.*?(\d+\.?\d*)/i);
-            if (match) {
+        // DAYS TO COVER
+        if (text.toLowerCase().includes('days to cover') || text.toLowerCase().includes('tage bis')) {
+            const daysMatch = text.match(/days\s+to\s+cover.*?(\d+(?:\.\d+)?)/i);
+            if (daysMatch) {
+                const days = parseFloat(daysMatch[1]);
                 factors.push({
                     icon: '📅',
                     label: 'Days to Cover',
-                    value: match[1] + ' days',
-                    status: parseFloat(match[1]) > 5 ? 'high' : 'normal'
+                    value: `${days} Tage`,
+                    status: days > 5 ? 'high' : days > 3 ? 'moderate' : 'normal',
+                    description: days > 5 ? 'Hoher Deckungsbedarf!' : 'Zeit zum Schließen von Shorts'
                 });
             }
         }
 
-        if (text.toLowerCase().includes('volume') || text.toLowerCase().includes('spike')) {
-            factors.push({
-                icon: '📈',
-                label: 'Volumen Aktivität',
-                value: text.toLowerCase().includes('high') || text.toLowerCase().includes('spike') ? 'Erhöht' : 'Normal',
-                status: text.toLowerCase().includes('high') || text.toLowerCase().includes('spike') ? 'high' : 'normal'
-            });
+        // FTD (Failure to Deliver)
+        if (text.toLowerCase().includes('ftd') || text.toLowerCase().includes('failure to deliver') || text.toLowerCase().includes('lieferausfall')) {
+            const ftdMatch = text.match(/ftd.*?(\d+(?:,\d+)?)\s*(?:shares|aktien|million|m\b)/i);
+            if (ftdMatch) {
+                factors.push({
+                    icon: '⚠️',
+                    label: 'FTDs',
+                    value: ftdMatch[1].replace(',', '.') + (ftdMatch[0].toLowerCase().includes('million') ? 'M' : ''),
+                    status: 'high',
+                    description: 'Nicht gelieferte Aktien - Squeeze-Katalysator!'
+                });
+            } else if (text.toLowerCase().includes('ftd')) {
+                factors.push({
+                    icon: '⚠️',
+                    label: 'FTDs',
+                    value: 'Erhöht',
+                    status: 'high',
+                    description: 'Lieferausfälle detektiert'
+                });
+            }
         }
 
-        if (text.toLowerCase().includes('sentiment') || text.toLowerCase().includes('retail')) {
+        // VOLUME / HANDELSVOLUMEN
+        if (text.toLowerCase().includes('volume') || text.toLowerCase().includes('spike') || text.toLowerCase().includes('handelsvolumen')) {
+            const volumeMatch = text.match(/volume.*?(\d+(?:\.\d+)?)\s*(?:million|m\b|prozent|%)/i);
+            if (volumeMatch) {
+                factors.push({
+                    icon: '📈',
+                    label: 'Handelsvolumen',
+                    value: volumeMatch[0].includes('%') ? `+${volumeMatch[1]}%` : `${volumeMatch[1]}M`,
+                    status: 'high',
+                    description: 'Erhöhte Handelsaktivität'
+                });
+            } else {
+                factors.push({
+                    icon: '📈',
+                    label: 'Volumen Aktivität',
+                    value: text.toLowerCase().includes('high') || text.toLowerCase().includes('spike') || text.toLowerCase().includes('erhöht') ? 'Erhöht' : 'Normal',
+                    status: text.toLowerCase().includes('high') || text.toLowerCase().includes('spike') ? 'high' : 'normal',
+                    description: 'Handelsaktivität'
+                });
+            }
+        }
+
+        // RETAIL SENTIMENT
+        if (text.toLowerCase().includes('sentiment') || text.toLowerCase().includes('retail') || text.toLowerCase().includes('social media') || text.toLowerCase().includes('reddit')) {
             factors.push({
                 icon: '💬',
                 label: 'Retail Sentiment',
-                value: text.toLowerCase().includes('strong') || text.toLowerCase().includes('high') ? 'Stark' : 'Moderat',
-                status: text.toLowerCase().includes('strong') || text.toLowerCase().includes('high') ? 'high' : 'normal'
+                value: text.toLowerCase().includes('strong') || text.toLowerCase().includes('bullish') || text.toLowerCase().includes('stark') ? 'Stark Bullish' : 'Moderat',
+                status: text.toLowerCase().includes('strong') || text.toLowerCase().includes('bullish') ? 'high' : 'normal',
+                description: 'Kleinanleger-Stimmung'
             });
         }
 
-        if (factors.length === 0) {
-            return '<p class="no-factors">Faktoren werden in der detaillierten Analyse besprochen.</p>';
+        // OPTIONS ACTIVITY
+        if (text.toLowerCase().includes('option') || text.toLowerCase().includes('call') || text.toLowerCase().includes('put')) {
+            const callPutRatio = text.match(/(?:call|put).*?ratio.*?(\d+(?:\.\d+)?)/i);
+            if (callPutRatio) {
+                factors.push({
+                    icon: '📑',
+                    label: 'Options Aktivität',
+                    value: `Ratio: ${callPutRatio[1]}`,
+                    status: 'high',
+                    description: 'Optionshandel-Aktivität'
+                });
+            } else {
+                factors.push({
+                    icon: '📑',
+                    label: 'Options Aktivität',
+                    value: text.toLowerCase().includes('unusual') || text.toLowerCase().includes('erhöht') ? 'Ungewöhnlich Hoch' : 'Erhöht',
+                    status: 'high',
+                    description: 'Gamma Squeeze möglich'
+                });
+            }
         }
 
-        return factors.map(factor => `
-            <div class="squeeze-factor ${factor.status}">
-                <span class="factor-icon">${factor.icon}</span>
-                <div class="factor-content">
-                    <div class="factor-label">${factor.label}</div>
-                    <div class="factor-value">${factor.value}</div>
+        // CATALYST / KATALYSATOR
+        if (text.toLowerCase().includes('catalyst') || text.toLowerCase().includes('katalysator') || text.toLowerCase().includes('announcement')) {
+            factors.push({
+                icon: '🎯',
+                label: 'Katalysatoren',
+                value: 'Vorhanden',
+                status: 'high',
+                description: 'News/Events als Auslöser'
+            });
+        }
+
+        console.log('[AI] Extracted', factors.length, 'squeeze factors');
+
+        if (factors.length === 0) {
+            // Create generic summary from text
+            return `
+                <div class="due-diligence-summary">
+                    <p class="no-factors-msg">
+                        📋 <strong>Hinweis:</strong> Keine spezifischen Squeeze-Faktoren in der Analyse gefunden. 
+                        Lesen Sie die vollständige Analyse unten für Details.
+                    </p>
                 </div>
+            `;
+        }
+
+        return `
+            <div class="squeeze-factors-grid">
+                ${factors.map(factor => `
+                    <div class="squeeze-factor ${factor.status}">
+                        <div class="factor-header">
+                            <span class="factor-icon">${factor.icon}</span>
+                            <div class="factor-label">${factor.label}</div>
+                        </div>
+                        <div class="factor-value">${factor.value}</div>
+                        <div class="factor-description">${factor.description}</div>
+                    </div>
+                `).join('')}
             </div>
-        `).join('');
+            <div class="dd-disclaimer">
+                <small>⚠️ Dies ist keine Anlageberatung. Short Squeezes sind hochriskant und unvorhersehbar. Eigene Due Diligence erforderlich.</small>
+            </div>
+        `;
     }
 
     /**
@@ -484,26 +705,42 @@ class AIAnalysisVisualizer {
      * Generate insights list (risks or opportunities)
      */
     generateInsightsList(text, type) {
-        if (!text) return '<p class="no-data">Keine Daten verfügbar</p>';
+        if (!text || text.trim().length === 0) {
+            return `<p class="no-data">Keine ${type === 'risk' ? 'Risiken' : 'Chancen'} identifiziert</p>`;
+        }
+
+        console.log(`[AI] Generating ${type} list from text length:`, text.length);
 
         // Parse numbered or bulleted list
-        const items = text.split(/\d+\.\s+|\*\s+|\-\s+/).filter(item => item.trim().length > 10);
+        let items = text.split(/\d+\.\s+|\*\s+|\-\s+/).filter(item => item.trim().length > 10);
+
+        // If no items found with delimiters, try splitting by newlines
+        if (items.length === 0) {
+            items = text.split(/\n/).filter(item => item.trim().length > 10);
+        }
+
+        // If still no items, split by sentences
+        if (items.length === 0) {
+            const sentences = text.split(/\.\s+/).filter(s => s.trim().length > 20);
+            items = sentences;
+        }
+
+        console.log(`[AI] Found ${items.length} ${type} items`);
 
         if (items.length === 0) {
-            // Fallback: split by sentences
-            const sentences = text.split(/\.\s+/).filter(s => s.trim().length > 20);
-            return sentences.slice(0, 5).map(item => `
+            // Last fallback: show full text
+            return `
                 <div class="insight-item">
                     <span class="insight-bullet">${type === 'risk' ? '⚠️' : '✅'}</span>
-                    <span class="insight-text">${item.trim()}.</span>
+                    <span class="insight-text">${text.trim()}</span>
                 </div>
-            `).join('');
+            `;
         }
 
         return items.slice(0, 5).map(item => `
             <div class="insight-item">
                 <span class="insight-bullet">${type === 'risk' ? '⚠️' : '✅'}</span>
-                <span class="insight-text">${item.trim()}</span>
+                <span class="insight-text">${item.trim().replace(/\.$/, '')}${item.trim().endsWith('.') ? '' : '.'}</span>
             </div>
         `).join('');
     }

@@ -91,9 +91,14 @@ class PortfolioService:
     def get_portfolio(user_id: int) -> Dict[str, Any]:
         """Get user's complete portfolio with calculated metrics"""
         try:
+            logger.info(f"[Portfolio] Getting portfolio for user {user_id}")
+            
+            # Use optimized query with single DB call
             portfolio_items = Portfolio.query.filter_by(user_id=user_id).all()
+            logger.info(f"[Portfolio] Found {len(portfolio_items)} items")
 
             if not portfolio_items:
+                logger.info(f"[Portfolio] No items found for user {user_id}")
                 return {
                     'items': [],
                     'summary': {
@@ -106,14 +111,21 @@ class PortfolioService:
                 }
 
             # Update all portfolio items with current prices
+            logger.info("[Portfolio] Updating portfolio items with current prices")
             for item in portfolio_items:
-                PortfolioService.update_portfolio_item(item)
+                try:
+                    PortfolioService.update_portfolio_item(item)
+                except Exception as item_error:
+                    logger.error(f"[Portfolio] Error updating {item.ticker}: {str(item_error)}")
+                    # Continue with other items even if one fails
 
             # Calculate portfolio summary
             total_value = sum(item.current_value or 0 for item in portfolio_items)
             total_invested = sum(item.total_invested or 0 for item in portfolio_items)
             total_gain_loss = total_value - total_invested
             total_gain_loss_percent = (total_gain_loss / total_invested * 100) if total_invested > 0 else 0
+
+            logger.info(f"[Portfolio] Summary - Value: ${total_value:.2f}, Invested: ${total_invested:.2f}, G/L: ${total_gain_loss:.2f} ({total_gain_loss_percent:.2f}%)")
 
             # Calculate diversification
             diversification = PortfolioService._calculate_diversification(portfolio_items)
@@ -123,7 +135,7 @@ class PortfolioService:
             top_gainers = [item.to_dict() for item in sorted_items[:3] if (item.gain_loss_percent or 0) > 0]
             top_losers = [item.to_dict() for item in sorted_items[-3:] if (item.gain_loss_percent or 0) < 0]
 
-            return {
+            result = {
                 'items': [item.to_dict() for item in portfolio_items],
                 'summary': {
                     'total_value': round(total_value, 2),
@@ -136,12 +148,21 @@ class PortfolioService:
                     'top_losers': top_losers
                 }
             }
+            
+            logger.info(f"[Portfolio] Successfully returning {len(result['items'])} items")
+            return result
 
         except Exception as e:
-            logger.error(f"Error getting portfolio: {str(e)}")
+            logger.error(f"[Portfolio] Critical error getting portfolio: {str(e)}", exc_info=True)
             return {
                 'items': [],
-                'summary': {},
+                'summary': {
+                    'total_value': 0,
+                    'total_invested': 0,
+                    'total_gain_loss': 0,
+                    'total_gain_loss_percent': 0,
+                    'positions': 0
+                },
                 'error': str(e)
             }
 

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Portfolio Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .loading { opacity: 0.5; }
+        .positive { color: green; }
+        .negative { color: red; }
+        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #4CAF50; color: white; }
+        .error-state { color: red; padding: 20px; text-align: center; }
+        .empty-state { padding: 40px; text-align: center; color: #666; }
+    </style>
+</head>
+<body>
+    <h1>Portfolio Test</h1>
+    
+    <div>
+        <label>JWT Token (from login):</label><br>
+        <input type="text" id="tokenInput" style="width: 500px;" placeholder="Paste JWT token here">
+        <button onclick="testPortfolio()">Test Portfolio Load</button>
+    </div>
+    
+    <div id="summary" style="margin-top: 20px;"></div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Symbol</th>
+                <th>Name</th>
+                <th>Shares</th>
+                <th>Current Price</th>
+                <th>Value</th>
+                <th>Gain/Loss %</th>
+            </tr>
+        </thead>
+        <tbody id="portfolioTableBody">
+            <tr><td colspan="6">Kein Token eingegeben...</td></tr>
+        </tbody>
+    </table>
+    
+    <div id="logs" style="margin-top: 20px; padding: 10px; background: #f0f0f0; font-family: monospace; font-size: 12px; max-height: 400px; overflow-y: auto;"></div>
+
+    <script>
+        function log(msg) {
+            const logsDiv = document.getElementById('logs');
+            logsDiv.innerHTML += new Date().toLocaleTimeString() + ' - ' + msg + '<br>';
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+            console.log(msg);
+        }
+
+        async function testPortfolio() {
+            const token = document.getElementById('tokenInput').value.trim();
+            
+            if (!token) {
+                alert('Please enter a JWT token');
+                return;
+            }
+            
+            const tbody = document.getElementById('portfolioTableBody');
+            tbody.innerHTML = '<tr><td colspan="6">Loading...</td></tr>';
+            
+            try {
+                log('[Test] Fetching portfolio...');
+                
+                const response = await fetch('http://127.0.0.1:5000/api/portfolio/', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                log(`[Test] Response status: ${response.status}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                log(`[Test] Data received: ${JSON.stringify(data).substring(0, 200)}...`);
+                
+                // Display summary
+                const summary = data.summary || {};
+                document.getElementById('summary').innerHTML = `
+                    <h3>Summary</h3>
+                    <p>Total Value: $${(summary.total_value || 0).toLocaleString()}</p>
+                    <p>Total Invested: $${(summary.total_invested || 0).toLocaleString()}</p>
+                    <p class="${(summary.total_gain_loss || 0) >= 0 ? 'positive' : 'negative'}">
+                        Gain/Loss: $${(summary.total_gain_loss || 0).toLocaleString()} 
+                        (${(summary.total_gain_loss_percent || 0).toFixed(2)}%)
+                    </p>
+                    <p>Positions: ${summary.positions || 0}</p>
+                `;
+                
+                // Display items
+                const items = data.items || [];
+                log(`[Test] Displaying ${items.length} items`);
+                
+                if (items.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No portfolio items</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = items.map(item => `
+                    <tr>
+                        <td><strong>${item.ticker}</strong></td>
+                        <td>${item.company_name || item.ticker}</td>
+                        <td>${(item.shares || 0).toFixed(2)}</td>
+                        <td>$${(item.current_price || 0).toFixed(2)}</td>
+                        <td>$${(item.current_value || 0).toFixed(2)}</td>
+                        <td class="${(item.gain_loss_percent || 0) >= 0 ? 'positive' : 'negative'}">
+                            ${(item.gain_loss_percent || 0) >= 0 ? '+' : ''}${(item.gain_loss_percent || 0).toFixed(2)}%
+                        </td>
+                    </tr>
+                `).join('');
+                
+                log('[Test] Display complete!');
+                
+            } catch (error) {
+                log(`[Test] ERROR: ${error.message}`);
+                tbody.innerHTML = `<tr><td colspan="6" class="error-state">Error: ${error.message}</td></tr>`;
+            }
+        }
+        
+        log('[Test] Page loaded');
+    </script>
+</body>
+</html>

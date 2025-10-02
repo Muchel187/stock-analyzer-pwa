@@ -857,35 +857,73 @@ class StockAnalyzerApp {
     }
 
     initTechnicalCharts(technical) {
-        if (!technical) return;
+        if (!technical) {
+            console.warn('[Technical] No technical data available');
+            return;
+        }
 
-        // RSI Gauge Chart
-        this.createRSIGaugeChart(technical.rsi);
+        console.log('[Technical] Initializing technical charts with data:', technical);
 
-        // MACD Bar Chart
-        this.createMACDChart(technical.macd);
+        // Wait for DOM to be ready
+        setTimeout(() => {
+            try {
+                // RSI Gauge Chart
+                if (technical.rsi !== undefined && technical.rsi !== null) {
+                    this.createRSIGaugeChart(technical.rsi);
+                } else {
+                    console.warn('[Technical] RSI data missing');
+                }
 
-        // Bollinger Bands Position Chart
-        this.createBollingerChart(technical.bollinger_bands);
+                // MACD Bar Chart
+                if (technical.macd) {
+                    this.createMACDChart(technical.macd);
+                } else {
+                    console.warn('[Technical] MACD data missing');
+                }
 
-        // Volatility Gauge
-        this.createVolatilityChart(technical.volatility);
+                // Bollinger Bands Position Chart
+                if (technical.bollinger_bands) {
+                    this.createBollingerChart(technical.bollinger_bands);
+                } else {
+                    console.warn('[Technical] Bollinger Bands data missing');
+                }
 
-        // Moving Averages Comparison
-        this.createMovingAveragesChart(technical);
+                // Volatility Gauge
+                if (technical.volatility !== undefined && technical.volatility !== null) {
+                    this.createVolatilityChart(technical.volatility);
+                } else {
+                    console.warn('[Technical] Volatility data missing');
+                }
+
+                // Moving Averages Comparison
+                this.createMovingAveragesChart(technical);
+
+                console.log('[Technical] All charts initialized successfully');
+            } catch (error) {
+                console.error('[Technical] Error initializing charts:', error);
+            }
+        }, 150); // Increased timeout for DOM readiness
     }
 
     createRSIGaugeChart(rsi) {
         const canvas = document.getElementById('rsiGaugeChart');
-        if (!canvas) return;
+        if (!canvas) {
+            console.warn('[Technical] RSI canvas not found');
+            return;
+        }
 
         const ctx = canvas.getContext('2d');
+        if (!ctx) {
+            console.error('[Technical] Could not get 2D context for RSI chart');
+            return;
+        }
 
         if (this.rsiChart) {
             this.rsiChart.destroy();
         }
 
-        const rsiValue = rsi || 50;
+        const rsiValue = rsi !== undefined && rsi !== null ? rsi : 50;
+        console.log('[Technical] Creating RSI chart with value:', rsiValue);
 
         this.rsiChart = new Chart(ctx, {
             type: 'doughnut',
@@ -1414,57 +1452,119 @@ class StockAnalyzerApp {
             return;
         }
 
-        const container = document.getElementById('portfolioDetails');
-        if (!container) {
-            console.error('Portfolio container not found');
+        // Find both containers (we have multiple portfolio elements)
+        const detailSummaryContainer = document.getElementById('portfolioDetailSummary');
+        const tableBody = document.getElementById('portfolioTableBody');
+        
+        if (!tableBody) {
+            console.error('Portfolio table body not found');
             return;
         }
 
-        container.classList.add('loading');
+        // Show loading state
+        tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center;"><div class="spinner"></div> Lade Portfolio...</td></tr>';
 
         try {
+            console.log('[Portfolio] Fetching portfolio data...');
             const portfolio = await api.getPortfolio();
-            console.log('Portfolio loaded:', portfolio); // Debug log
-            container.classList.remove('loading');
+            console.log('[Portfolio] Data received:', portfolio);
+            
+            // Validate response structure
+            if (!portfolio || typeof portfolio !== 'object') {
+                throw new Error('Invalid portfolio response');
+            }
+
+            if (!portfolio.items || !Array.isArray(portfolio.items)) {
+                console.warn('[Portfolio] No items array in response, using empty array');
+                portfolio.items = [];
+            }
+
+            if (!portfolio.summary || typeof portfolio.summary !== 'object') {
+                console.warn('[Portfolio] No summary in response, using defaults');
+                portfolio.summary = {
+                    total_value: 0,
+                    total_invested: 0,
+                    total_gain_loss: 0,
+                    total_gain_loss_percent: 0,
+                    positions: 0
+                };
+            }
+
+            console.log(`[Portfolio] Displaying ${portfolio.items.length} items`);
             this.displayPortfolioDetails(portfolio);
         } catch (error) {
-            console.error('Error loading portfolio:', error);
-            container.classList.remove('loading');
+            console.error('[Portfolio] Error loading portfolio:', error);
+            
+            // Show error state in table
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="7">
+                        <div class="error-state" style="text-align: center; padding: 20px; color: var(--error-color);">
+                            <div style="font-size: 48px; margin-bottom: 10px;">⚠️</div>
+                            <div style="font-weight: bold; margin-bottom: 5px;">Fehler beim Laden des Portfolios</div>
+                            <div style="font-size: 14px; opacity: 0.8;">${error.message || 'Unbekannter Fehler'}</div>
+                            <button class="btn btn-primary" onclick="app.loadPortfolio()" style="margin-top: 15px;">🔄 Erneut versuchen</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            
             this.showNotification('Portfolio konnte nicht geladen werden', 'error');
         }
     }
 
     displayPortfolioDetails(portfolio) {
+        console.log('[displayPortfolioDetails] Starting display with data:', portfolio);
+        
         // Display summary
-        const summary = portfolio.summary;
-        document.getElementById('portfolioDetailSummary').innerHTML = `
-            <div class="portfolio-metrics">
-                <div class="portfolio-metric">
-                    <div class="portfolio-metric-label">Gesamtwert</div>
-                    <div class="portfolio-metric-value">$${summary.total_value?.toLocaleString() || '0'}</div>
-                </div>
-                <div class="portfolio-metric">
-                    <div class="portfolio-metric-label">Investiert</div>
-                    <div class="portfolio-metric-value">$${summary.total_invested?.toLocaleString() || '0'}</div>
-                </div>
-                <div class="portfolio-metric">
-                    <div class="portfolio-metric-label">Gewinn/Verlust</div>
-                    <div class="portfolio-metric-value ${summary.total_gain_loss > 0 ? 'positive' : 'negative'}">
-                        $${summary.total_gain_loss?.toLocaleString() || '0'}
-                        (${summary.total_gain_loss_percent?.toFixed(2) || '0'}%)
+        const summary = portfolio.summary || {};
+        const summaryContainer = document.getElementById('portfolioDetailSummary');
+        
+        if (summaryContainer) {
+            console.log('[displayPortfolioDetails] Rendering summary');
+            summaryContainer.innerHTML = `
+                <div class="portfolio-metrics">
+                    <div class="portfolio-metric">
+                        <div class="portfolio-metric-label">Gesamtwert</div>
+                        <div class="portfolio-metric-value">$${(summary.total_value || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                    </div>
+                    <div class="portfolio-metric">
+                        <div class="portfolio-metric-label">Investiert</div>
+                        <div class="portfolio-metric-value">$${(summary.total_invested || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                    </div>
+                    <div class="portfolio-metric">
+                        <div class="portfolio-metric-label">Gewinn/Verlust</div>
+                        <div class="portfolio-metric-value ${(summary.total_gain_loss || 0) >= 0 ? 'positive' : 'negative'}">
+                            $${(summary.total_gain_loss || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                            (${(summary.total_gain_loss_percent || 0).toFixed(2)}%)
+                        </div>
+                    </div>
+                    <div class="portfolio-metric">
+                        <div class="portfolio-metric-label">Positionen</div>
+                        <div class="portfolio-metric-value">${summary.positions || 0}</div>
                     </div>
                 </div>
-            </div>
-            <div class="export-actions">
-                <button class="export-btn" onclick="app.exportPortfolio()">
-                    📥 Export as CSV
-                </button>
-            </div>
-        `;
+                <div class="export-actions">
+                    <button class="export-btn" onclick="app.exportPortfolio()">
+                        📥 Export as CSV
+                    </button>
+                </div>
+            `;
+        } else {
+            console.warn('[displayPortfolioDetails] Summary container not found');
+        }
 
         // Display holdings
         const tbody = document.getElementById('portfolioTableBody');
-        if (portfolio.items.length === 0) {
+        if (!tbody) {
+            console.error('[displayPortfolioDetails] Table body not found!');
+            return;
+        }
+
+        const items = portfolio.items || [];
+        console.log(`[displayPortfolioDetails] Rendering ${items.length} holdings`);
+
+        if (items.length === 0) {
             tbody.innerHTML = `
                 <tr>
                     <td colspan="7">
@@ -1472,6 +1572,7 @@ class StockAnalyzerApp {
                             <div class="empty-state-icon">💼</div>
                             <div class="empty-state-message">Keine Positionen im Portfolio</div>
                             <div class="empty-state-hint">Fügen Sie Transaktionen hinzu, um Ihr Portfolio zu beginnen</div>
+                            <button class="btn btn-primary" onclick="app.showAddTransaction()" style="margin-top: 15px;">+ Transaktion hinzufügen</button>
                         </div>
                     </td>
                 </tr>
@@ -1479,21 +1580,41 @@ class StockAnalyzerApp {
             return;
         }
 
-        tbody.innerHTML = portfolio.items.map(item => `
-            <tr class="clickable" onclick="app.navigateToAnalysis('${item.ticker}')" style="cursor: pointer;" title="Klicken für Analyse von ${item.ticker}">
-                <td><strong>${item.ticker}</strong></td>
-                <td>${item.company_name}</td>
-                <td>${item.shares}</td>
-                <td>$${item.current_price?.toFixed(2) || '-'}</td>
-                <td>$${item.current_value?.toFixed(2) || '-'}</td>
-                <td class="${item.gain_loss_percent > 0 ? 'positive' : 'negative'}">
-                    ${item.gain_loss_percent > 0 ? '+' : ''}${item.gain_loss_percent?.toFixed(2) || '0'}%
-                </td>
-                <td onclick="event.stopPropagation()">
-                    <button class="btn-icon" onclick="app.sellPosition('${item.ticker}')">Verkaufen</button>
-                </td>
-            </tr>
-        `).join('');
+        // Render each item with proper error handling
+        const rows = items.map(item => {
+            try {
+                const ticker = item.ticker || 'N/A';
+                const companyName = item.company_name || ticker;
+                const shares = (item.shares || 0).toFixed(2);
+                const currentPrice = item.current_price ? `$${item.current_price.toFixed(2)}` : '-';
+                const currentValue = item.current_value ? `$${item.current_value.toFixed(2)}` : '-';
+                const gainLossPercent = (item.gain_loss_percent || 0);
+                const gainLossClass = gainLossPercent >= 0 ? 'positive' : 'negative';
+                const gainLossSign = gainLossPercent >= 0 ? '+' : '';
+
+                return `
+                    <tr class="clickable" onclick="app.navigateToAnalysis('${ticker}')" style="cursor: pointer;" title="Klicken für Analyse von ${ticker}">
+                        <td><strong>${ticker}</strong></td>
+                        <td>${companyName}</td>
+                        <td>${shares}</td>
+                        <td>${currentPrice}</td>
+                        <td>${currentValue}</td>
+                        <td class="${gainLossClass}">
+                            ${gainLossSign}${gainLossPercent.toFixed(2)}%
+                        </td>
+                        <td onclick="event.stopPropagation()">
+                            <button class="btn-icon" onclick="app.sellPosition('${ticker}')">Verkaufen</button>
+                        </td>
+                    </tr>
+                `;
+            } catch (err) {
+                console.error('[displayPortfolioDetails] Error rendering item:', item, err);
+                return '';
+            }
+        }).filter(row => row !== '').join('');
+
+        tbody.innerHTML = rows;
+        console.log('[displayPortfolioDetails] Holdings table rendered successfully');
     }
 
     // Watchlist functionality
@@ -2258,17 +2379,30 @@ class StockAnalyzerApp {
     }
 
     renderComparisonChart(priceHistories) {
-        const ctx = document.getElementById('compareChart');
-        if (!ctx) return;
+        const canvas = document.getElementById('compareChart');
+        if (!canvas) {
+            console.error('[Comparison] Canvas element not found: compareChart');
+            return;
+        }
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+            console.error('[Comparison] Could not get 2D context from canvas');
+            return;
+        }
 
         // Destroy existing chart
         if (this.compareChartInstance) {
             this.compareChartInstance.destroy();
+            this.compareChartInstance = null;
         }
 
         if (!priceHistories || priceHistories.length === 0) {
+            console.warn('[Comparison] No price histories to display');
             return;
         }
+
+        console.log('[Comparison] Rendering chart with', priceHistories.length, 'stocks');
 
         // Use the dates from the first ticker
         const dates = priceHistories[0].data.map(d => d.date);

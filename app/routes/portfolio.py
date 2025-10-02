@@ -11,12 +11,51 @@ def get_portfolio():
     """Get user's portfolio"""
     try:
         user_id = get_jwt_identity()
+        
+        # Validate user_id
+        if not user_id:
+            return jsonify({'error': 'Invalid user ID'}), 401
+        
+        # Convert user_id to int if it's a string (JWT stores as string)
+        try:
+            user_id = int(user_id)
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid user ID format'}), 401
+        
         portfolio = PortfolioService.get_portfolio(user_id)
+
+        # Ensure proper structure even if error occurred
+        if not isinstance(portfolio, dict):
+            return jsonify({
+                'items': [],
+                'summary': {
+                    'total_value': 0,
+                    'total_invested': 0,
+                    'total_gain_loss': 0,
+                    'total_gain_loss_percent': 0,
+                    'positions': 0
+                },
+                'error': 'Invalid portfolio data'
+            }), 500
 
         return jsonify(portfolio), 200
 
     except Exception as e:
-        return jsonify({'error': f'Failed to get portfolio: {str(e)}'}), 500
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"[Portfolio API] Error: {error_details}")
+        
+        return jsonify({
+            'error': f'Failed to get portfolio: {str(e)}',
+            'items': [],
+            'summary': {
+                'total_value': 0,
+                'total_invested': 0,
+                'total_gain_loss': 0,
+                'total_gain_loss_percent': 0,
+                'positions': 0
+            }
+        }), 500
 
 @bp.route('/transaction', methods=['POST'])
 @jwt_required()
