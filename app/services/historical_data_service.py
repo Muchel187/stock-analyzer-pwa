@@ -279,14 +279,17 @@ class HistoricalDataService:
         try:
             from app.services.alternative_data_sources import AlphaVantageService
 
-            # Map period to outputsize
-            outputsize = 'compact' if period in ['1d', '5d', '1mo'] else 'full'
+            # ALWAYS use 'compact' to avoid getting 20+ years of data (6500+ points)
+            # 'compact' returns last 100 data points, which is sufficient for 6mo period
+            outputsize = 'compact'
 
             data_response = AlphaVantageService.get_time_series_daily(ticker, outputsize)
 
             if data_response and data_response.get('data'):
-                logger.info(f"[Historical] Got {len(data_response['data'])} points from Alpha Vantage")
-                return data_response['data'], 'alpha_vantage'
+                # Limit to max 500 points to prevent database overload
+                data = data_response['data'][:500]
+                logger.info(f"[Historical] Got {len(data)} points from Alpha Vantage (limited from {len(data_response['data'])})")
+                return data, 'alpha_vantage'
 
             return None, None
 
@@ -346,51 +349,62 @@ class HistoricalDataService:
 
     @staticmethod
     def _store_data(ticker: str, data: List[Dict], source: str) -> bool:
-        """Store historical data in database"""
+        """Store historical data in database using optimized batch insert"""
         try:
-            stored_count = 0
+            if not data or len(data) == 0:
+                logger.warning(f"[Historical] No data to store for {ticker}")
+                return False
+
+            # Limit data to prevent database overload (max 500 points)
+            if len(data) > 500:
+                logger.warning(f"[Historical] Limiting data from {len(data)} to 500 points for {ticker}")
+                data = data[:500]
+
+            # Get all existing dates for this ticker in one query
+            existing_dates = {
+                row.date: row for row in
+                HistoricalPrice.query.filter_by(ticker=ticker).all()
+            }
+
+            new_records = []
+            updated_count = 0
 
             for point in data:
-                try:
-                    # Check if entry already exists
-                    existing = HistoricalPrice.query.filter_by(
+                point_date = point['date']
+
+                if point_date in existing_dates:
+                    # Update existing record
+                    existing = existing_dates[point_date]
+                    existing.open = point.get('open', existing.open)
+                    existing.high = point.get('high', existing.high)
+                    existing.low = point.get('low', existing.low)
+                    existing.close = point.get('close', existing.close)
+                    existing.volume = point.get('volume', existing.volume)
+                    existing.source = source
+                    existing.updated_at = datetime.now()
+                    updated_count += 1
+                else:
+                    # Prepare new record for batch insert
+                    new_records.append(HistoricalPrice(
                         ticker=ticker,
-                        date=point['date']
-                    ).first()
+                        date=point_date,
+                        open=point.get('open'),
+                        high=point.get('high'),
+                        low=point.get('low'),
+                        close=point.get('close'),
+                        volume=point.get('volume'),
+                        source=source
+                    ))
 
-                    if existing:
-                        # Update existing entry
-                        existing.open = point.get('open', existing.open)
-                        existing.high = point.get('high', existing.high)
-                        existing.low = point.get('low', existing.low)
-                        existing.close = point.get('close', existing.close)
-                        existing.volume = point.get('volume', existing.volume)
-                        existing.source = source
-                        existing.updated_at = datetime.now()
-                    else:
-                        # Create new entry
-                        price = HistoricalPrice(
-                            ticker=ticker,
-                            date=point['date'],
-                            open=point.get('open'),
-                            high=point.get('high'),
-                            low=point.get('low'),
-                            close=point.get('close'),
-                            volume=point.get('volume'),
-                            source=source
-                        )
-                        db.session.add(price)
-
-                    stored_count += 1
-
-                except IntegrityError:
-                    # Duplicate entry, skip
-                    db.session.rollback()
-                    continue
+            # Batch insert all new records at once
+            if new_records:
+                db.session.bulk_save_objects(new_records)
 
             db.session.commit()
-            logger.info(f"[Historical] Stored {stored_count} price points for {ticker}")
-            return stored_count > 0
+
+            total_stored = len(new_records) + updated_count
+            logger.info(f"[Historical] Stored {total_stored} points for {ticker} ({len(new_records)} new, {updated_count} updated)")
+            return total_stored > 0
 
         except Exception as e:
             logger.error(f"[Historical] Error storing data for {ticker}: {e}")
