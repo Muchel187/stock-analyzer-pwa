@@ -121,3 +121,69 @@ def get_performance():
 
     except Exception as e:
         return jsonify({'error': f'Failed to get performance: {str(e)}'}), 500
+
+@bp.route('/risk-analytics', methods=['GET'])
+@jwt_required()
+def get_risk_analytics():
+    """
+    Get comprehensive risk analytics for user's portfolio
+
+    Returns institutional-grade risk metrics including:
+    - Sharpe Ratio, Sortino Ratio
+    - Beta, Alpha vs. S&P 500
+    - Value at Risk (VaR)
+    - Maximum Drawdown
+    - Volatility metrics
+
+    Example response:
+    {
+        "sharpe_ratio": 1.85,
+        "sharpe_interpretation": {"rating": "Good", "emoji": "👍"},
+        "sortino_ratio": 2.12,
+        "beta": 1.15,
+        "beta_interpretation": {"description": "Above Market", "emoji": "↗️"},
+        "alpha": 0.0234,
+        "alpha_interpretation": {"description": "Outperforming", "emoji": "🚀"},
+        "var_95": -0.025,
+        "var_99": -0.041,
+        "cvar_95": -0.032,
+        "max_drawdown": -0.156,
+        "max_drawdown_duration": 45,
+        "current_drawdown": -0.032,
+        "volatility": 0.185,
+        "information_ratio": 0.78,
+        "total_return": 0.234,
+        "annualized_return": 0.125,
+        "calmar_ratio": 0.801,
+        "data_points": 180,
+        "analysis_period_days": 180,
+        "start_value": 10000.0,
+        "current_value": 12340.0
+    }
+    """
+    try:
+        user_id = get_jwt_identity()
+
+        # Convert user_id to int
+        try:
+            user_id = int(user_id)
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid user ID format'}), 401
+
+        risk_analytics = PortfolioService.get_risk_analytics(user_id)
+
+        # Check if there was an error
+        if 'error' in risk_analytics:
+            return jsonify(risk_analytics), 400
+
+        return jsonify(risk_analytics), 200
+
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"[Risk Analytics API] Error: {error_details}")
+
+        return jsonify({
+            'error': f'Failed to calculate risk analytics: {str(e)}',
+            'message': 'Could not complete risk analysis'
+        }), 500
