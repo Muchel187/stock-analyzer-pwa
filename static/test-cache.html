@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IndexedDB Cache System Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+        }
+        .test-section h2 {
+            margin-top: 0;
+            color: #666;
+            font-size: 18px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button.secondary {
+            background: #2196F3;
+        }
+        button.secondary:hover {
+            background: #0b7dda;
+        }
+        button.danger {
+            background: #f44336;
+        }
+        button.danger:hover {
+            background: #da190b;
+        }
+        .results {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .log {
+            margin: 5px 0;
+            padding: 5px;
+        }
+        .log.success { color: #4CAF50; }
+        .log.error { color: #f44336; }
+        .log.info { color: #2196F3; }
+        .log.warning { color: #ff9800; }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .stat-card {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .stat-card h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: #666;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-left: 5px;
+        }
+        .badge.safe { background: #4CAF50; color: white; }
+        .badge.warning { background: #ff9800; color: white; }
+        .badge.critical { background: #f44336; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗄️ IndexedDB Cache System - Test Suite</h1>
+
+        <!-- Test 1: Initialize -->
+        <div class="test-section">
+            <h2>1. Initialize Cache System</h2>
+            <button onclick="testInit()">Initialize</button>
+            <div id="init-results" class="results"></div>
+        </div>
+
+        <!-- Test 2: Cache Quote -->
+        <div class="test-section">
+            <h2>2. Test Quote Caching</h2>
+            <input type="text" id="quote-ticker" placeholder="AAPL" style="padding: 8px; width: 100px;">
+            <button onclick="testGetQuote()">Fetch Quote</button>
+            <button class="secondary" onclick="testGetQuoteCached()">Get from Cache</button>
+            <div id="quote-results" class="results"></div>
+        </div>
+
+        <!-- Test 3: Batch Fetch -->
+        <div class="test-section">
+            <h2>3. Test Batch Fetching</h2>
+            <button onclick="testBatchFetch()">Batch Fetch (AAPL, MSFT, GOOGL, TSLA)</button>
+            <div id="batch-results" class="results"></div>
+        </div>
+
+        <!-- Test 4: Cache Stats -->
+        <div class="test-section">
+            <h2>4. Cache Statistics</h2>
+            <button onclick="testCacheStats()">Get Cache Stats</button>
+            <button class="secondary" onclick="testUsageReport()">Usage Report</button>
+            <div id="stats-container"></div>
+        </div>
+
+        <!-- Test 5: Rate Limiter -->
+        <div class="test-section">
+            <h2>5. Rate Limiter Test</h2>
+            <button onclick="testRateLimit()">Check Rate Limits</button>
+            <button class="secondary" onclick="testRecordCall()">Record API Call</button>
+            <div id="ratelimit-results" class="results"></div>
+        </div>
+
+        <!-- Test 6: Cleanup -->
+        <div class="test-section">
+            <h2>6. Cleanup Operations</h2>
+            <button onclick="testClearExpired()">Clear Expired</button>
+            <button class="danger" onclick="testClearAll()">Clear All Cache</button>
+            <div id="cleanup-results" class="results"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import ApiManager from './js/services/ApiManager.js';
+
+        let apiManager = null;
+        window.apiManager = null;
+
+        // Initialize
+        window.testInit = async () => {
+            const results = document.getElementById('init-results');
+            log(results, 'info', 'Initializing API Manager...');
+
+            try {
+                apiManager = new ApiManager();
+                await apiManager.init();
+                window.apiManager = apiManager;
+                log(results, 'success', '✓ API Manager initialized successfully');
+                log(results, 'info', '✓ IndexedDB database created');
+                log(results, 'info', '✓ Rate limiter configured');
+            } catch (error) {
+                log(results, 'error', `✗ Initialization failed: ${error.message}`);
+            }
+        };
+
+        // Test Get Quote
+        window.testGetQuote = async () => {
+            if (!apiManager) {
+                alert('Please initialize first');
+                return;
+            }
+
+            const ticker = document.getElementById('quote-ticker').value || 'AAPL';
+            const results = document.getElementById('quote-results');
+            results.innerHTML = '';
+            log(results, 'info', `Fetching quote for ${ticker}...`);
+
+            const start = Date.now();
+            try {
+                const data = await apiManager.getQuote(ticker);
+                const duration = Date.now() - start;
+
+                log(results, 'success', `✓ Quote fetched in ${duration}ms`);
+                log(results, 'info', `From Cache: ${data.fromCache ? 'YES' : 'NO'}`);
+                log(results, 'info', `Company: ${data.info?.company_name || 'N/A'}`);
+                log(results, 'info', `Price: $${data.info?.price || data.info?.current_price || 'N/A'}`);
+            } catch (error) {
+                log(results, 'error', `✗ Error: ${error.message}`);
+            }
+        };
+
+        // Test Get from Cache
+        window.testGetQuoteCached = async () => {
+            if (!apiManager) {
+                alert('Please initialize first');
+                return;
+            }
+
+            const ticker = document.getElementById('quote-ticker').value || 'AAPL';
+            const results = document.getElementById('quote-results');
+            results.innerHTML = '';
+            log(results, 'info', `Getting ${ticker} from cache only...`);
+
+            try {
+                const cached = await apiManager.cache.get('quotes', ticker.toUpperCase());
+                if (cached) {
+                    log(results, 'success', '✓ Found in cache');
+                    log(results, 'info', `Last Updated: ${new Date(cached.lastUpdated).toLocaleString()}`);
+                    log(results, 'info', `TTL: ${new Date(cached.ttl).toLocaleString()}`);
+                    log(results, 'info', `Expired: ${cached.ttl < Date.now() ? 'YES' : 'NO'}`);
+                } else {
+                    log(results, 'warning', '⚠ Not found in cache');
+                }
+            } catch (error) {
+                log(results, 'error', `✗ Error: ${error.message}`);
+            }
+        };
+
+        // Test Batch Fetch
+        window.testBatchFetch = async () => {
+            if (!apiManager) {
+                alert('Please initialize first');
+                return;
+            }
+
+            const results = document.getElementById('batch-results');
+            results.innerHTML = '';
+            const symbols = ['AAPL', 'MSFT', 'GOOGL', 'TSLA'];
+            log(results, 'info', `Batch fetching ${symbols.length} quotes...`);
+
+            const start = Date.now();
+            try {
+                const data = await apiManager.batchGetQuotes(symbols);
+                const duration = Date.now() - start;
+
+                log(results, 'success', `✓ Batch fetch complete in ${duration}ms`);
+
+                data.forEach(result => {
+                    if (result.success) {
+                        const cached = result.data.fromCache ? '📦' : '🌐';
+                        log(results, 'info', `${cached} ${result.symbol}: $${result.data.info?.current_price || 'N/A'}`);
+                    } else {
+                        log(results, 'error', `✗ ${result.symbol}: ${result.error}`);
+                    }
+                });
+            } catch (error) {
+                log(results, 'error', `✗ Error: ${error.message}`);
+            }
+        };
+
+        // Test Cache Stats
+        window.testCacheStats = async () => {
+            if (!apiManager) {
+                alert('Please initialize first');
+                return;
+            }
+
+            const container = document.getElementById('stats-container');
+            container.innerHTML = '<div class="results"><div class="log info">Loading stats...</div></div>';
+
+            try {
+                const stats = await apiManager.getCacheStats();
+
+                container.innerHTML = `
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <h3>Quotes Cached</h3>
+                            <div class="stat-value">${stats.cache.quotes || 0}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Historical Data</h3>
+                            <div class="stat-value">${stats.cache.historical || 0}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Fundamentals</h3>
+                            <div class="stat-value">${stats.cache.fundamentals || 0}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>API Calls Tracked</h3>
+                            <div class="stat-value">${stats.cache.apiTracker || 0}</div>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                container.innerHTML = `<div class="results"><div class="log error">✗ Error: ${error.message}</div></div>`;
+            }
+        };
+
+        // Test Usage Report
+        window.testUsageReport = async () => {
+            if (!apiManager) {
+                alert('Please initialize first');
+                return;
+            }
+
+            const container = document.getElementById('stats-container');
+            container.innerHTML = '<div class="results"><div class="log info">Loading usage report...</div></div>';
+
+            try {
+                const report = await apiManager.getUsageReport();
+
+                let html = '<div class="stats-grid">';
+                for (const [provider, data] of Object.entries(report.apiCalls)) {
+                    const level = data.utilization >= 90 ? 'critical' : data.utilization >= 75 ? 'warning' : 'safe';
+                    html += `
+                        <div class="stat-card">
+                            <h3>${provider}<span class="badge ${level}">${data.utilization}</span></h3>
+                            <div class="stat-value">${data.remaining}/${data.limit}</div>
+                            <small>remaining</small>
+                        </div>
+                    `;
+                }
+                html += '</div>';
+
+                container.innerHTML = html;
+            } catch (error) {
+                container.innerHTML = `<div class="results"><div class="log error">✗ Error: ${error.message}</div></div>`;
+            }
+        };
+
+        // Test Rate Limit
+        window.testRateLimit = async () => {
+            if (!apiManager) {
+                alert('Please initialize first');
+                return;
+            }
+
+            const results = document.getElementById('ratelimit-results');
+            results.innerHTML = '';
+
+            try {
+                const canCall = await apiManager.rateLimiter.checkLimit('stock_api');
+                const remaining = await apiManager.rateLimiter.getRemainingCalls('stock_api');
+                const stats = await apiManager.rateLimiter.getStats('stock_api');
+
+                log(results, 'info', `Can Make Call: ${canCall ? 'YES ✓' : 'NO ✗'}`);
+                log(results, 'info', `Remaining Calls: ${remaining}`);
+                log(results, 'info', `Utilization: ${stats.utilizationPercent}%`);
+                log(results, 'info', `Reset In: ${apiManager.rateLimiter.formatDuration(stats.resetIn)}`);
+            } catch (error) {
+                log(results, 'error', `✗ Error: ${error.message}`);
+            }
+        };
+
+        // Test Record Call
+        window.testRecordCall = async () => {
+            if (!apiManager) {
+                alert('Please initialize first');
+                return;
+            }
+
+            const results = document.getElementById('ratelimit-results');
+            results.innerHTML = '';
+
+            try {
+                await apiManager.rateLimiter.recordCall('stock_api', { test: true });
+                log(results, 'success', '✓ API call recorded');
+
+                const remaining = await apiManager.rateLimiter.getRemainingCalls('stock_api');
+                log(results, 'info', `Remaining Calls: ${remaining}`);
+            } catch (error) {
+                log(results, 'error', `✗ Error: ${error.message}`);
+            }
+        };
+
+        // Test Clear Expired
+        window.testClearExpired = async () => {
+            if (!apiManager) {
+                alert('Please initialize first');
+                return;
+            }
+
+            const results = document.getElementById('cleanup-results');
+            results.innerHTML = '';
+            log(results, 'info', 'Clearing expired cache entries...');
+
+            try {
+                const quotesCleared = await apiManager.cache.clearExpired('quotes');
+                const historicalCleared = await apiManager.cache.clearExpired('historical');
+
+                log(results, 'success', `✓ Cleared ${quotesCleared} expired quotes`);
+                log(results, 'success', `✓ Cleared ${historicalCleared} expired historical data`);
+            } catch (error) {
+                log(results, 'error', `✗ Error: ${error.message}`);
+            }
+        };
+
+        // Test Clear All
+        window.testClearAll = async () => {
+            if (!apiManager || !confirm('Clear all cache? This cannot be undone.')) {
+                return;
+            }
+
+            const results = document.getElementById('cleanup-results');
+            results.innerHTML = '';
+            log(results, 'warning', 'Clearing all cache...');
+
+            try {
+                await apiManager.clearCache();
+                log(results, 'success', '✓ All caches cleared');
+            } catch (error) {
+                log(results, 'error', `✗ Error: ${error.message}`);
+            }
+        };
+
+        // Helper function to log messages
+        function log(container, type, message) {
+            const div = document.createElement('div');
+            div.className = `log ${type}`;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // Auto-initialize on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('Test page loaded');
+        });
+    </script>
+</body>
+</html>
