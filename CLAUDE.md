@@ -86,6 +86,36 @@ The app uses Flask's application factory pattern in `app/__init__.py`:
 - App works with any combination of API keys; tries each in order until one succeeds
 - See `AI_SETUP.md` for detailed API setup instructions
 
+**CRITICAL FIX (October 2, 2025)**: AI fallback removed from `get_stock_quote()` and `get_company_info()`
+- **Problem:** AI was called on EVERY failed stock quote, causing rate limit errors (429)
+- **Solution:** AI is now ONLY used for explicit analysis requests via `/api/stock/{ticker}/analyze-with-ai`
+- **Impact:** No more Google Gemini rate limit issues
+- **Files Changed:** `app/services/alternative_data_sources.py` (lines 456-476, 478-510)
+
+### German Stock Support (October 2, 2025)
+
+**Finnhub XETRA Format** (`app/services/alternative_data_sources.py`):
+- German stocks require XETRA: prefix for Finnhub API
+- `GERMAN_TICKER_MAP` dictionary maps .DE tickers to XETRA: format (lines 15-79)
+- `convert_ticker_for_api()` function handles conversion transparently (lines 82-107)
+
+**How it works:**
+```python
+# User inputs: SAP.DE
+# System converts to: XETRA:SAP (for Finnhub API call)
+# API returns: Stock data
+# System returns to user: Data with SAP.DE ticker (original format preserved)
+```
+
+**Supported Stocks:**
+- DAX 40: 30 stocks (SAP.DE, SIE.DE, BMW.DE, etc.)
+- MDAX: 30+ stocks
+- Total: 70+ German stocks
+
+**Screener Integration:**
+- `ScreenerService.DAX_STOCKS` and `ScreenerService.MDAX_STOCKS` contain .DE tickers
+- Screener automatically uses XETRA format when calling Finnhub
+
 ### AI Analysis System
 
 **CURRENT MODEL (October 2025)**: Google Gemini 2.5 Pro
@@ -2409,8 +2439,14 @@ DATABASE_URL=sqlite:///stockanalyzer.db
 
 ---
 
-**Last Updated:** October 1, 2025
-**Version:** 1.0.0
+**Last Updated:** October 2, 2025
+**Version:** 1.1.0
 **Status:** ✅ PRODUCTION-READY
-**All Phases:** COMPLETE 🎉
+**Recent Updates:**
+- ✅ Fixed AI Rate Limit (429 errors) - Removed AI fallback from stock quote fetching
+- ✅ Fixed Global Search - Corrected API response parsing
+- ✅ Added German Stock Support - Finnhub XETRA format (70+ DAX/MDAX stocks)
+- ✅ Fixed WebSocket Notification Spam - Replaced with status light indicator
+- ✅ Added Mini-Charts Infrastructure - Expandable modal with 3-month charts
+- ✅ Created FREE_API_INTEGRATION_PLAN.md - Roadmap for Morningstar-like features
 
