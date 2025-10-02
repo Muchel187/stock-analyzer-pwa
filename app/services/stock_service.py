@@ -68,9 +68,26 @@ class StockService:
 
     @staticmethod
     def get_price_history(ticker: str, period: str = "1y") -> Optional[Dict[str, Any]]:
-        """Get historical price data using Alpha Vantage"""
+        """Get historical price data using the new HistoricalDataService"""
         try:
-            # Map period to outputsize (approximate)
+            # Import here to avoid circular import
+            from app.services.historical_data_service import HistoricalDataService
+
+            logger.info(f"Getting price history for {ticker}, period={period}")
+
+            # Use the new historical data service with smart caching
+            historical_data = HistoricalDataService.get_historical_data(
+                ticker=ticker,
+                period=period,
+                force_update=False
+            )
+
+            if historical_data and historical_data.get('data'):
+                logger.info(f"Got {len(historical_data.get('data', []))} data points from {historical_data.get('source', 'unknown')}")
+                return historical_data
+
+            # If historical service fails, try the old fallback as last resort
+            logger.warning(f"HistoricalDataService failed for {ticker}, trying old fallback")
             period_map = {
                 '1mo': 30,
                 '3mo': 90,
@@ -81,13 +98,12 @@ class StockService:
             }
             outputsize = period_map.get(period, 365)
 
-            # Use fallback service for historical data
             fallback_data = FallbackDataService.get_historical_data(ticker, outputsize=outputsize)
             if fallback_data:
                 fallback_data['period'] = period
                 return fallback_data
 
-            logger.error(f"Failed to get history for {ticker}")
+            logger.error(f"Failed to get history for {ticker} from all sources")
             return None
 
         except Exception as e:

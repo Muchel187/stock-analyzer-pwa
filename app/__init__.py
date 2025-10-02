@@ -101,11 +101,14 @@ def create_app(config_name='default'):
         app.logger.setLevel(logging.INFO)
         app.logger.info('Stock Analyzer startup')
 
-    # Start scheduler for background jobs (disabled for now to avoid errors)
-    # if not app.testing:
-    #     from jobs.scheduler import setup_jobs
-    #     setup_jobs(app, scheduler)
-    #     scheduler.start()
+    # Initialize data scheduler for historical price updates
+    if not app.testing and config_name != 'testing':
+        try:
+            from app.services.data_scheduler import data_scheduler
+            data_scheduler.init_app(app)
+            app.logger.info('Data scheduler initialized successfully')
+        except Exception as e:
+            app.logger.error(f'Failed to initialize data scheduler: {e}')
 
     # Create database tables (only if not using migrations)
     # with app.app_context():

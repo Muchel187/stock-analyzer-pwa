@@ -1,0 +1,60 @@
+{
+  "timestamp": "2025-10-02T13:58:15.055302",
+  "results": [
+    {
+      "ticker": "AAPL",
+      "exchange": "NASDAQ",
+      "status": "partial",
+      "status_code": 200,
+      "data_found": false
+    },
+    {
+      "ticker": "MSFT",
+      "exchange": "NASDAQ",
+      "status": "partial",
+      "status_code": 200,
+      "data_found": false
+    },
+    {
+      "ticker": "GOOGL",
+      "exchange": "NASDAQ",
+      "status": "success",
+      "status_code": 200,
+      "data_found": true
+    },
+    {
+      "ticker": "TSLA",
+      "exchange": "NASDAQ",
+      "status": "partial",
+      "status_code": 200,
+      "data_found": false
+    },
+    {
+      "ticker": "BMW",
+      "exchange": "ETR",
+      "status": "partial",
+      "status_code": 200,
+      "data_found": false
+    },
+    {
+      "ticker": "SAP",
+      "exchange": "ETR",
+      "status": "partial",
+      "status_code": 200,
+      "data_found": false
+    },
+    {
+      "ticker": "SPY",
+      "exchange": "NYSEARCA",
+      "status": "partial",
+      "status_code": 200,
+      "data_found": false
+    }
+  ],
+  "summary": {
+    "total": 7,
+    "successful": 1,
+    "partial": 6,
+    "failed": 0
+  }
+}
