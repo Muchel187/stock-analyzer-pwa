@@ -372,6 +372,15 @@ class StockService:
             url = "https://finnhub.io/api/v1/stock/recommendation"
             params = {'symbol': ticker.upper(), 'token': api_key}
             response = requests.get(url, params=params, timeout=10)
+            
+            # Handle rate limit or forbidden
+            if response.status_code == 403:
+                logger.warning(f"Finnhub API access forbidden for analyst ratings (rate limit or invalid API key): {ticker}")
+                return None
+            elif response.status_code == 429:
+                logger.warning(f"Finnhub API rate limit exceeded for analyst ratings: {ticker}")
+                return None
+            
             response.raise_for_status()
             data = response.json()
             
@@ -397,6 +406,9 @@ class StockService:
                     latest.get('strongSell', 0)
                 ])
             }
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"Error getting analyst ratings for {ticker}: {e}")
+            return None
         except Exception as e:
             logger.error(f"Error getting analyst ratings for {ticker}: {str(e)}")
             return None
@@ -416,6 +428,15 @@ class StockService:
             url = "https://finnhub.io/api/v1/stock/price-target"
             params = {'symbol': ticker.upper(), 'token': api_key}
             response = requests.get(url, params=params, timeout=10)
+            
+            # Handle rate limit or forbidden
+            if response.status_code == 403:
+                logger.warning(f"Finnhub API access forbidden for price target (rate limit or invalid API key): {ticker}")
+                return None
+            elif response.status_code == 429:
+                logger.warning(f"Finnhub API rate limit exceeded for price target: {ticker}")
+                return None
+            
             response.raise_for_status()
             data = response.json()
             
@@ -431,6 +452,9 @@ class StockService:
                 'last_updated': data.get('lastUpdated'),
                 'number_analysts': data.get('numberOfAnalysts', 0)
             }
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"Error getting price target for {ticker}: {e}")
+            return None
         except Exception as e:
             logger.error(f"Error getting price target for {ticker}: {str(e)}")
             return None

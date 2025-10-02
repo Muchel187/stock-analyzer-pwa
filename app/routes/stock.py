@@ -60,55 +60,86 @@ def analyze_with_ai_get(ticker):
         # Get stock data (now includes analyst_ratings, price_target, insider_transactions)
         stock_info = StockService.get_stock_info(ticker)
         if not stock_info:
-            return jsonify({'error': f'Stock {ticker} not found'}), 404
+            return jsonify({
+                'error': f'Stock {ticker} not found',
+                'message': 'Unable to fetch stock data. Please check ticker symbol and try again.'
+            }), 404
 
-        # Get additional analysis data
+        # Get additional analysis data (these might be None, handle gracefully)
         technical = StockService.calculate_technical_indicators(ticker)
         fundamental = StockService.get_fundamental_analysis(ticker)
 
         # Get aggregated news sentiment
         from app.services.news_service import NewsService
-        news_sentiment = NewsService.get_aggregated_sentiment(ticker, days=7)
+        news_sentiment = None
+        try:
+            news_sentiment = NewsService.get_aggregated_sentiment(ticker, days=7)
+        except Exception as e:
+            import logging
+            logging.error(f"Failed to get news sentiment for {ticker}: {str(e)}")
 
         # Analyze short squeeze potential
         from app.services.short_squeeze_analyzer import ShortSqueezeAnalyzer
-        squeeze_analysis = ShortSqueezeAnalyzer.analyze_squeeze_potential(
-            stock_info,
-            technical,
-            {'volume': stock_info.get('volume')}
-        )
+        squeeze_analysis = None
+        try:
+            squeeze_analysis = ShortSqueezeAnalyzer.analyze_squeeze_potential(
+                stock_info,
+                technical if technical else {},
+                {'volume': stock_info.get('volume', 0)}
+            )
+        except Exception as e:
+            import logging
+            logging.error(f"Failed to analyze squeeze potential for {ticker}: {str(e)}")
 
         # Try to get actual short data from ChartExchange
         from app.services.short_data_service import ShortDataService
-        short_data = ShortDataService.get_short_data(ticker)
-
-        # If we have real short data, enhance the squeeze analysis
-        if short_data:
-            squeeze_analysis['real_short_data'] = short_data
-            squeeze_analysis['note'] = 'Enhanced with actual short interest data from ChartExchange.com'
+        short_data = None
+        try:
+            short_data = ShortDataService.get_short_data(ticker)
+            # If we have real short data, enhance the squeeze analysis
+            if short_data and squeeze_analysis:
+                squeeze_analysis['real_short_data'] = short_data
+                squeeze_analysis['note'] = 'Enhanced with actual short interest data from ChartExchange.com'
+        except Exception as e:
+            import logging
+            logging.error(f"Failed to get short data for {ticker}: {str(e)}")
 
         # Generate AI analysis with enhanced data
         ai_service = AIService()
         ai_analysis = ai_service.analyze_stock_with_ai(
             stock_info,
-            technical,
-            fundamental,
+            technical if technical else {},
+            fundamental if fundamental else {},
             short_data,
             news_sentiment  # NEW: Pass news sentiment
         )
 
-        if not ai_analysis:
-            return jsonify({'error': 'AI analysis failed'}), 500
+        if not ai_analysis or 'error' in ai_analysis:
+            error_msg = ai_analysis.get('error', 'AI analysis failed') if ai_analysis else 'AI analysis failed'
+            return jsonify({
+                'error': error_msg,
+                'ticker': ticker,
+                'message': 'AI analysis could not be completed. Some data may be unavailable.'
+            }), 500
 
         # Add squeeze analysis and news sentiment to response
-        ai_analysis['squeeze_analysis'] = squeeze_analysis
-        ai_analysis['news_sentiment'] = news_sentiment
+        if squeeze_analysis:
+            ai_analysis['squeeze_analysis'] = squeeze_analysis
+        if news_sentiment:
+            ai_analysis['news_sentiment'] = news_sentiment
         ai_analysis['timestamp'] = datetime.now(timezone.utc).isoformat()
 
         return jsonify(ai_analysis), 200
 
     except Exception as e:
-        return jsonify({'error': f'AI analysis failed: {str(e)}'}), 500
+        import logging
+        import traceback
+        logging.error(f"AI analysis failed for {ticker}: {str(e)}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({
+            'error': f'AI analysis failed: {str(e)}',
+            'ticker': ticker
+        }), 500
 
 @bp.route('/analyze-with-ai', methods=['POST'])
 def analyze_with_ai():

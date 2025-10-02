@@ -48,6 +48,17 @@ class AIService:
                 'analysis': 'Please configure Google Gemini (GOOGLE_API_KEY) or OpenAI API key (OPENAI_API_KEY) for AI-powered analysis'
             }
 
+        # Ensure stock_data is not None and has ticker
+        if not stock_data:
+            logger.error("Stock data is None in AI analysis")
+            return {
+                'error': 'Invalid stock data',
+                'analysis': 'Stock data is missing or invalid'
+            }
+
+        # Ensure we have at least a ticker
+        ticker = stock_data.get('ticker', 'UNKNOWN')
+        
         try:
             prompt = self._create_analysis_prompt(stock_data, technical_indicators, fundamental_analysis, short_data, news_sentiment)
 
@@ -59,14 +70,15 @@ class AIService:
             if not analysis_text:
                 return {
                     'error': 'AI service error',
-                    'analysis': 'Unable to generate AI analysis at this time'
+                    'analysis': 'Unable to generate AI analysis at this time',
+                    'ticker': ticker
                 }
 
             # Parse the AI response into structured format
             structured_analysis = self._parse_ai_response(analysis_text)
 
             return {
-                'ticker': stock_data.get('ticker'),
+                'ticker': ticker,
                 'ai_analysis': structured_analysis,
                 'raw_analysis': analysis_text,
                 'confidence_score': self._calculate_confidence_score(stock_data, technical_indicators, fundamental_analysis),
@@ -77,9 +89,12 @@ class AIService:
 
         except Exception as e:
             logger.error(f"Error in AI analysis: {str(e)}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return {
                 'error': 'AI service error',
-                'analysis': f'Error generating analysis: {str(e)}'
+                'analysis': f'Error generating analysis: {str(e)}',
+                'ticker': ticker
             }
 
     def _call_google_gemini(self, prompt: str) -> Optional[str]:
@@ -176,56 +191,67 @@ class AIService:
                                 short_data: Dict[str, Any] = None,
                                 news_sentiment: Dict[str, Any] = None) -> str:
         """Create an optimized, compact prompt for AI analysis"""
-        ticker = stock_data.get('ticker', 'N/A')
-        company = stock_data.get('company_name', 'Unknown')
+        # Safely get ticker and company name
+        ticker = stock_data.get('ticker', 'UNKNOWN') if stock_data else 'UNKNOWN'
+        company = stock_data.get('company_name', 'Unknown Company') if stock_data else 'Unknown Company'
         
         # Build compact data sections
         sections = []
         
-        # Market data (compact)
-        market = f"Price ${stock_data.get('current_price', 'N/A')}, "
-        market += f"P/E {stock_data.get('pe_ratio', 'N/A')}, "
-        market += f"Beta {stock_data.get('beta', 'N/A')}"
-        sections.append(f"Market: {market}")
+        # Market data (compact) - safely handle None values
+        if stock_data:
+            market = f"Price ${stock_data.get('current_price', 'N/A')}, "
+            market += f"P/E {stock_data.get('pe_ratio', 'N/A')}, "
+            market += f"Beta {stock_data.get('beta', 'N/A')}"
+            sections.append(f"Market: {market}")
         
-        # Technical (compact)
-        if technical_indicators:
+        # Technical (compact) - only if available
+        if technical_indicators and isinstance(technical_indicators, dict):
             tech = f"RSI {technical_indicators.get('rsi', 'N/A')}, "
-            tech += f"MACD {technical_indicators.get('macd', {}).get('macd', 'N/A')}, "
+            macd_data = technical_indicators.get('macd', {})
+            if isinstance(macd_data, dict):
+                tech += f"MACD {macd_data.get('macd', 'N/A')}, "
+            else:
+                tech += f"MACD N/A, "
             tech += f"1M Change {technical_indicators.get('price_change_1m', 'N/A')}%"
             sections.append(f"Technical: {tech}")
+        else:
+            sections.append("Technical: Data unavailable")
         
-        # Fundamental (compact)
-        if fundamental_analysis:
+        # Fundamental (compact) - only if available
+        if fundamental_analysis and isinstance(fundamental_analysis, dict):
             fund = f"Score {fundamental_analysis.get('overall_score', 'N/A')}/100, "
             fund += f"Rec: {fundamental_analysis.get('recommendation', 'N/A')}"
             sections.append(f"Fundamental: {fund}")
+        else:
+            sections.append("Fundamental: Data unavailable")
         
-        # Analyst consensus (compact)
-        if stock_data.get('analyst_ratings'):
+        # Analyst consensus (compact) - only if available
+        if stock_data and stock_data.get('analyst_ratings'):
             ratings = stock_data['analyst_ratings']
-            total = ratings['total_analysts']
+            total = ratings.get('total_analysts', 0)
             if total > 0:
-                buy_pct = (ratings['strong_buy'] + ratings['buy']) / total * 100
+                buy_pct = (ratings.get('strong_buy', 0) + ratings.get('buy', 0)) / total * 100
                 sections.append(f"Analysts: {total} total, {buy_pct:.0f}% Buy/Strong Buy")
         
-        if stock_data.get('price_target') and stock_data['price_target'].get('target_mean'):
+        if stock_data and stock_data.get('price_target'):
             target = stock_data['price_target']
-            sections.append(f"Analyst Target: ${target['target_mean']:.2f} (Range ${target['target_low']:.2f}-${target['target_high']:.2f})")
+            if target.get('target_mean'):
+                sections.append(f"Analyst Target: ${target['target_mean']:.2f} (Range ${target.get('target_low', 'N/A')}-${target.get('target_high', 'N/A')})")
         
-        # Insider activity (compact)
-        if stock_data.get('insider_transactions'):
+        # Insider activity (compact) - only if available
+        if stock_data and stock_data.get('insider_transactions'):
             insider = stock_data['insider_transactions']
-            signal = insider['signal']
-            sections.append(f"Insiders: {signal.upper()}, Net ${insider['net_value']:,.0f} ({insider['net_shares']:,} shares)")
+            signal = insider.get('signal', 'unknown')
+            sections.append(f"Insiders: {signal.upper()}, Net ${insider.get('net_value', 0):,.0f} ({insider.get('net_shares', 0):,} shares)")
         
-        # News sentiment (compact)
-        if news_sentiment and news_sentiment.get('article_count', 0) > 0:
+        # News sentiment (compact) - only if available
+        if news_sentiment and isinstance(news_sentiment, dict) and news_sentiment.get('article_count', 0) > 0:
             sent = news_sentiment
-            sections.append(f"News: {sent['overall_score']:.2f} score, {sent['sentiment_percentages']['bullish_pct']}% bullish")
+            sections.append(f"News: {sent.get('overall_score', 0):.2f} score, {sent.get('sentiment_percentages', {}).get('bullish_pct', 0)}% bullish")
         
-        # Short data (compact)
-        if short_data:
+        # Short data (compact) - only if available
+        if short_data and isinstance(short_data, dict):
             short_info = f"Short Interest: {short_data.get('short_percent_of_float', 'N/A')}% float, "
             short_info += f"DTC {short_data.get('days_to_cover', 'N/A')}"
             sections.append(f"Short Data: {short_info}")
@@ -240,18 +266,20 @@ DATA:
 - You MUST provide ALL 7 sections below
 - Each section MUST contain substantial analysis (minimum 3-5 sentences)
 - Use section headers EXACTLY as shown: "## 1. TECHNICAL ANALYSIS", "## 2. FUNDAMENTAL ANALYSIS", etc.
-- Do NOT skip any section - write "Insufficient data" if data is missing, but provide the section
+- If data is missing, provide analysis based on available information and mention data limitations
+- Do NOT skip any section
 
 PROVIDE DETAILED ANALYSIS IN THE FOLLOWING 7 SECTIONS (ALL MANDATORY):
 
 ## 1. TECHNICAL ANALYSIS
 - Current trend direction (bullish/bearish/neutral) with specific evidence
 - Key support and resistance levels (provide actual price levels if possible)
-- RSI interpretation (currently {technical_indicators.get('rsi', 'N/A')} - overbought/oversold?)
+- RSI interpretation (currently {technical_indicators.get('rsi', 'N/A') if technical_indicators and isinstance(technical_indicators, dict) else 'N/A'} - overbought/oversold?)
 - MACD signals and momentum direction
 - Optimal entry/exit points based on current technicals
 - Volume analysis and recent trading patterns
 - Summary: Overall technical outlook (Bullish/Neutral/Bearish)
+- NOTE: If technical data is limited, focus on price action and provide qualitative analysis
 
 ## 2. FUNDAMENTAL ANALYSIS
 - Valuation assessment (undervalued/fairly valued/overvalued?) - explain why
@@ -260,7 +288,7 @@ PROVIDE DETAILED ANALYSIS IN THE FOLLOWING 7 SECTIONS (ALL MANDATORY):
 - Balance sheet strength (debt levels, cash position)
 - Competitive position in industry
 - Management quality and strategic direction
-- Compare with analyst consensus if available: {stock_data.get('analyst_ratings', {}).get('total_analysts', 0)} analysts
+- Compare with analyst consensus if available: {stock_data.get('analyst_ratings', {}).get('total_analysts', 0) if stock_data and isinstance(stock_data, dict) else 0} analysts
 - Summary: Overall fundamental health (Strong/Average/Weak)
 
 ## 3. KEY RISKS (HAUPTRISIKEN) ⚠️
@@ -312,7 +340,7 @@ Categories to consider: growth catalysts, upcoming product launches, market expa
 ## 5. PRICE TARGET 🎯
 **12-Month Price Target:** $XXX.XX (You MUST provide a specific number)
 
-**Current Price:** ${stock_data.get('current_price', 'N/A')}
+**Current Price:** ${stock_data.get('current_price', 'N/A') if stock_data and isinstance(stock_data, dict) else 'N/A'}
 
 **Valuation Method:** [Explain which method you used: DCF, P/E multiple comparison, Sum-of-Parts, or combination]
 
@@ -328,7 +356,7 @@ Categories to consider: growth catalysts, upcoming product launches, market expa
 - Base Case: $XX.XX (most likely scenario)
 - Bull Case: $XX.XX (optimistic scenario)
 
-{f"**Analyst Consensus Target:** ${stock_data.get('price_target', {}).get('target_mean', 'N/A')} (Range: ${stock_data.get('price_target', {}).get('target_low', 'N/A')} - ${stock_data.get('price_target', {}).get('target_high', 'N/A')})" if stock_data.get('price_target') else ""}
+{f"**Analyst Consensus Target:** ${stock_data.get('price_target', {}).get('target_mean', 'N/A')} (Range: ${stock_data.get('price_target', {}).get('target_low', 'N/A')} - ${stock_data.get('price_target', {}).get('target_high', 'N/A')})" if stock_data and isinstance(stock_data, dict) and stock_data.get('price_target') else ""}
 
 ## 6. SHORT SQUEEZE POTENTIAL 🔥
 **Squeeze Score:** XX/100 (You MUST provide a specific number from 0-100)
@@ -336,20 +364,20 @@ Categories to consider: growth catalysts, upcoming product launches, market expa
 **Due Diligence Factors Analysis:**
 
 **Short Interest Data:**
-- **Freefloat:** {short_data.get('free_float', 'Estimated: Medium (40-60%)')}
-- **Short Interest:** {short_data.get('short_percent_of_float', 'Estimated: 5-15%')} of float
-- **Days to Cover (DTC):** {short_data.get('days_to_cover', 'Estimated: 2-4 days')}
-- **Shares Shorted:** {short_data.get('short_volume', 'Not available')}
+- **Freefloat:** {short_data.get('free_float', 'Estimated: Medium (40-60%)') if short_data and isinstance(short_data, dict) else 'Estimated: Medium (40-60%)'}
+- **Short Interest:** {short_data.get('short_percent_of_float', 'Estimated: 5-15%') if short_data and isinstance(short_data, dict) else 'Estimated: 5-15%'} of float
+- **Days to Cover (DTC):** {short_data.get('days_to_cover', 'Estimated: 2-4 days') if short_data and isinstance(short_data, dict) else 'Estimated: 2-4 days'}
+- **Shares Shorted:** {short_data.get('short_volume', 'Not available') if short_data and isinstance(short_data, dict) else 'Not available'}
 
 **Trading Dynamics:**
-- **FTDs (Failure to Deliver):** {short_data.get('ftd_level', 'Assessment: Moderate - requires monitoring')}
-- **Borrowing Costs:** {short_data.get('borrow_fee', 'Estimated: 2-5% annually (Moderate)')}
-- **Recent Volume Spikes:** {short_data.get('volume_trend', 'Analyze recent 20-day volume vs. 90-day average')}
-- **Options Activity:** {short_data.get('options_flow', 'Monitor for unusual call buying or put/call ratio changes')}
+- **FTDs (Failure to Deliver):** {short_data.get('ftd_level', 'Assessment: Moderate - requires monitoring') if short_data and isinstance(short_data, dict) else 'Assessment: Moderate - requires monitoring'}
+- **Borrowing Costs:** {short_data.get('borrow_fee', 'Estimated: 2-5% annually (Moderate)') if short_data and isinstance(short_data, dict) else 'Estimated: 2-5% annually (Moderate)'}
+- **Recent Volume Spikes:** {short_data.get('volume_trend', 'Analyze recent 20-day volume vs. 90-day average') if short_data and isinstance(short_data, dict) else 'Analyze recent 20-day volume vs. 90-day average'}
+- **Options Activity:** {short_data.get('options_flow', 'Monitor for unusual call buying or put/call ratio changes') if short_data and isinstance(short_data, dict) else 'Monitor for unusual call buying or put/call ratio changes'}
 
 **Sentiment & Catalysts:**
-- **Social Media Sentiment:** {news_sentiment.get('social_sentiment', 'Assess: Bullish/Neutral/Bearish based on Reddit, Twitter activity')}
-- **Retail Interest Level:** {news_sentiment.get('retail_interest', 'Gauge: High/Medium/Low')}
+- **Social Media Sentiment:** {news_sentiment.get('social_sentiment', 'Assess: Bullish/Neutral/Bearish based on Reddit, Twitter activity') if news_sentiment and isinstance(news_sentiment, dict) else 'Assess: Bullish/Neutral/Bearish based on Reddit, Twitter activity'}
+- **Retail Interest Level:** {news_sentiment.get('retail_interest', 'Gauge: High/Medium/Low') if news_sentiment and isinstance(news_sentiment, dict) else 'Gauge: High/Medium/Low'}
 - **Upcoming Catalysts:** List any earnings, product launches, or events that could trigger squeeze
 
 **Squeeze Analysis Explanation:**

@@ -45,7 +45,20 @@ class StockCache(db.Model):
             )
             db.session.add(cache)
 
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            # Try to update existing record if unique constraint violation
+            cache = cls.query.filter_by(ticker=ticker, data_type=data_type).first()
+            if cache:
+                cache.data = data
+                cache.cached_at = datetime.now(timezone.utc)
+                cache.expires_at = expires_at
+                db.session.commit()
+            else:
+                raise e
+        
         return cache
 
     def __repr__(self):
