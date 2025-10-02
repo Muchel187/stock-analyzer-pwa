@@ -168,14 +168,10 @@ class StockAnalyzerApp {
                 this.updatePriceInUI(data.symbol, data.price);
             };
 
-            // Setup connection status callback
+            // Setup connection status callback - Update status light only (no notifications)
             this.websocketManager.onConnectionChange = (status) => {
                 console.log(`[App] WebSocket status: ${status}`);
-                if (status === 'connected') {
-                    this.showNotification('Echtzeit-Daten aktiv', 'success');
-                } else if (status === 'error' || status === 'failed') {
-                    this.showNotification('Echtzeit-Verbindung fehlgeschlagen', 'warning');
-                }
+                this.updateRealtimeStatusLight(status);
             };
 
         } catch (error) {
@@ -252,6 +248,62 @@ class StockAnalyzerApp {
                 // Note: Portfolio total value recalculation would happen on next refresh
             }
         });
+    }
+
+    /**
+     * Update realtime status light indicator
+     * @param {string} status - Connection status (connected/connecting/disconnected/error/failed)
+     */
+    updateRealtimeStatusLight(status) {
+        let statusLight = document.getElementById('realtimeStatusLight');
+
+        // Create status light if it doesn't exist
+        if (!statusLight) {
+            const navbar = document.querySelector('.nav-right');
+            if (navbar) {
+                statusLight = document.createElement('div');
+                statusLight.id = 'realtimeStatusLight';
+                statusLight.className = 'realtime-status-light';
+                statusLight.title = 'Echtzeit-Status';
+
+                // Insert before theme toggle
+                const themeToggle = navbar.querySelector('.theme-toggle-container');
+                if (themeToggle) {
+                    navbar.insertBefore(statusLight, themeToggle);
+                } else {
+                    navbar.appendChild(statusLight);
+                }
+            } else {
+                console.warn('[App] Could not find navbar to add status light');
+                return;
+            }
+        }
+
+        // Update status light color and tooltip based on connection status
+        statusLight.classList.remove('connected', 'connecting', 'disconnected', 'error');
+
+        switch (status) {
+            case 'connected':
+                statusLight.classList.add('connected');
+                statusLight.title = 'Echtzeit aktiv';
+                break;
+            case 'connecting':
+                statusLight.classList.add('connecting');
+                statusLight.title = 'Verbinde...';
+                break;
+            case 'disconnected':
+                statusLight.classList.add('disconnected');
+                statusLight.title = 'Nicht Echtzeit';
+                break;
+            case 'error':
+            case 'failed':
+                statusLight.classList.add('error');
+                statusLight.title = 'Verbindungsfehler';
+                break;
+            default:
+                statusLight.classList.add('disconnected');
+                statusLight.title = 'Unbekannter Status';
+        }
     }
 
     updateUserDisplay() {
