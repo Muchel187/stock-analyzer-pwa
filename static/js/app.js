@@ -332,17 +332,22 @@ class StockAnalyzerApp {
         }
 
         container.innerHTML = items.map(item => `
-            <div class="watchlist-item clickable" onclick="app.navigateToAnalysis('${item.ticker}')" title="Klicken für Analyse von ${item.ticker}">
-                <div class="watchlist-item-info">
-                    <div class="watchlist-item-ticker">${item.ticker}</div>
-                    <div class="watchlist-item-name">${item.company_name || ''}</div>
-                </div>
-                <div class="watchlist-item-price">
-                    <div class="watchlist-item-current">$${item.current_price?.toFixed(2) || '-'}</div>
-                    <div class="watchlist-item-change ${item.price_change_percent > 0 ? 'positive' : 'negative'}">
-                        ${item.price_change_percent > 0 ? '+' : ''}${item.price_change_percent?.toFixed(2) || '0'}%
+            <div class="watchlist-item">
+                <div class="watchlist-item-main clickable" onclick="app.navigateToAnalysis('${item.ticker}')" title="Klicken für Analyse von ${item.ticker}">
+                    <div class="watchlist-item-info">
+                        <div class="watchlist-item-ticker">${item.ticker}</div>
+                        <div class="watchlist-item-name">${item.company_name || ''}</div>
+                    </div>
+                    <div class="watchlist-item-price">
+                        <div class="watchlist-item-current">$${item.current_price?.toFixed(2) || '-'}</div>
+                        <div class="watchlist-item-change ${item.price_change_percent > 0 ? 'positive' : 'negative'}">
+                            ${item.price_change_percent > 0 ? '+' : ''}${item.price_change_percent?.toFixed(2) || '0'}%
+                        </div>
                     </div>
                 </div>
+                <button class="btn-ai-analyze" onclick="event.stopPropagation(); app.analyzeWithAI('${item.ticker}')" title="KI-Analyse für ${item.ticker}">
+                    <span class="ai-icon">🤖</span> KI
+                </button>
             </div>
         `).join('');
     }
@@ -543,6 +548,44 @@ class StockAnalyzerApp {
 
         // Trigger analysis
         this.analyzeStock();
+    }
+
+    // Quick AI analysis from watchlist
+    async analyzeWithAI(ticker) {
+        if (!ticker) {
+            this.showNotification('Kein Ticker angegeben', 'error');
+            return;
+        }
+
+        if (!this.currentUser) {
+            this.showNotification('Bitte melden Sie sich an für KI-Analyse', 'warning');
+            return;
+        }
+
+        try {
+            // Navigate to analysis page
+            this.showPage('analysis');
+
+            // Set ticker
+            document.getElementById('stockSearch').value = ticker.toUpperCase();
+
+            // Trigger full analysis first
+            await this.analyzeStock();
+
+            // Wait a bit for data to load, then switch to AI tab
+            setTimeout(() => {
+                // Click on AI Analysis tab
+                const aiTab = document.querySelector('[data-tab="ai"]');
+                if (aiTab) {
+                    aiTab.click();
+                    this.showNotification(`KI-Analyse wird geladen für ${ticker}...`, 'info');
+                }
+            }, 1000);
+
+        } catch (error) {
+            console.error('[App] Error in analyzeWithAI:', error);
+            this.showNotification('Fehler bei KI-Analyse', 'error');
+        }
     }
 
     // Alias for backward compatibility
