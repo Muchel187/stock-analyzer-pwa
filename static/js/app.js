@@ -96,6 +96,20 @@ class StockAnalyzerApp {
             e.preventDefault();
             await this.handleCreateAlert(e);
         });
+
+        // Transaction form
+        const transactionForm = document.getElementById('transactionForm');
+        transactionForm?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await this.handleAddTransaction(e);
+        });
+
+        // Watchlist form
+        const watchlistForm = document.getElementById('watchlistForm');
+        watchlistForm?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await this.handleAddToWatchlist(e);
+        });
     }
 
     async checkAuthentication() {
@@ -1596,7 +1610,7 @@ class StockAnalyzerApp {
         try {
             const alertData = {
                 ticker: ticker,
-                alert_type: condition === 'above' ? 'price_above' : 'price_below',
+                alert_type: condition === 'above' ? 'PRICE_ABOVE' : 'PRICE_BELOW',
                 target_value: targetPrice,
                 note: note || null
             };
@@ -2366,6 +2380,83 @@ class StockAnalyzerApp {
             case 'bullish': return '🟢';
             case 'bearish': return '🔴';
             default: return '⚪';
+        }
+    }
+
+    // Portfolio & Transaction Functions
+    showAddTransaction() {
+        // Set today's date as default
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('transactionDate').value = today;
+
+        // Clear form
+        document.getElementById('transactionForm').reset();
+
+        // Show modal
+        this.showModal('transactionModal');
+    }
+
+    async handleAddTransaction(e) {
+        const ticker = document.getElementById('transactionTicker').value.toUpperCase();
+        const type = document.getElementById('transactionType').value;
+        const shares = parseFloat(document.getElementById('transactionShares').value);
+        const price = parseFloat(document.getElementById('transactionPrice').value);
+        const fees = parseFloat(document.getElementById('transactionFees').value) || 0;
+        const date = document.getElementById('transactionDate').value;
+
+        try {
+            await api.addTransaction({
+                ticker,
+                transaction_type: type,
+                shares,
+                price,
+                fees,
+                transaction_date: date
+            });
+
+            this.showNotification(`Transaktion für ${ticker} erfolgreich hinzugefügt`, 'success');
+            this.closeModal('transactionModal');
+
+            // Refresh portfolio if on portfolio page
+            if (this.currentPage === 'portfolio') {
+                await this.loadPortfolio();
+            }
+        } catch (error) {
+            console.error('Error adding transaction:', error);
+            this.showNotification(error.message || 'Fehler beim Hinzufügen der Transaktion', 'error');
+        }
+    }
+
+    // Watchlist Functions
+    showAddToWatchlist() {
+        // Clear form
+        document.getElementById('watchlistForm').reset();
+
+        // Show modal
+        this.showModal('watchlistModal');
+    }
+
+    async handleAddToWatchlist(e) {
+        const ticker = document.getElementById('watchlistTicker').value.toUpperCase();
+        const notes = document.getElementById('watchlistNotes').value;
+        const tagsInput = document.getElementById('watchlistTags').value;
+
+        // Parse tags
+        const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(t => t) : [];
+
+        try {
+            await api.addToWatchlist(ticker, notes, tags);
+
+            this.showNotification(`${ticker} zur Watchlist hinzugefügt`, 'success');
+            this.closeModal('watchlistModal');
+
+            // Refresh watchlist if on watchlist page
+            if (this.currentPage === 'watchlist') {
+                await this.loadWatchlistItems();
+            }
+        } catch (error) {
+            console.error('Error adding to watchlist:', error);
+            this.showNotification(error.message || 'Fehler beim Hinzufügen zur Watchlist', 'error');
         }
     }
 }
