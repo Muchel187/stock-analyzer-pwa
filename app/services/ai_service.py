@@ -429,7 +429,7 @@ Your analysis is sought after by institutional investors, hedge funds, and indiv
                 "max_tokens": 4000
             }
 
-            response = requests.post(self.api_url, headers=self.headers, json=payload, timeout=30)
+            response = requests.post(self.api_url, headers=self.headers, json=payload, timeout=90)
 
             if response.status_code == 200:
                 result = response.json()
