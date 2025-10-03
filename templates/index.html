@@ -19,9 +19,10 @@
     <link rel="apple-touch-icon" href="/static/images/icon-192.png">
 
     <!-- CSS -->
-    <link rel="stylesheet" href="/static/css/styles.css?v=20251001">
-    <link rel="stylesheet" href="/static/css/components.css?v=20251001">
-    <link rel="stylesheet" href="/static/css/ai-analysis.css?v=20251001">
+    <link rel="stylesheet" href="/static/css/styles.css?v=20251003">
+    <link rel="stylesheet" href="/static/css/components.css?v=20251003">
+    <link rel="stylesheet" href="/static/css/ai-analysis.css?v=20251003">
+    <link rel="stylesheet" href="/static/css/technical-charts.css?v=20251003">
 
     <!-- Chart.js für Diagramme -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -484,7 +485,45 @@
                                 </div>
                             </div>
                             <div id="technical-tab" class="tab-pane">
-                                <!-- Technische Analyse -->
+                                <!-- Technische Analyse mit Charts -->
+                                <div class="technical-section-header">
+                                    <div>
+                                        <h2>📊 Technische Analyse</h2>
+                                        <p class="subtitle">Bollinger Bänder, MACD, RSI & Volumen</p>
+                                    </div>
+                                </div>
+
+                                <!-- Technical Indicators Summary -->
+                                <div class="chart-info-grid">
+                                    <div class="chart-info-card">
+                                        <div class="label">RSI (14)</div>
+                                        <div class="value" id="tech-rsi-value">-</div>
+                                        <div class="change" id="tech-rsi-status"></div>
+                                    </div>
+                                    <div class="chart-info-card">
+                                        <div class="label">MACD</div>
+                                        <div class="value" id="tech-macd-value">-</div>
+                                        <div class="change" id="tech-macd-status"></div>
+                                    </div>
+                                    <div class="chart-info-card">
+                                        <div class="label">Bollinger %</div>
+                                        <div class="value" id="tech-bb-value">-</div>
+                                        <div class="change" id="tech-bb-status"></div>
+                                    </div>
+                                    <div class="chart-info-card">
+                                        <div class="label">Volatilität</div>
+                                        <div class="value" id="tech-volatility-value">-</div>
+                                        <div class="change" id="tech-volatility-status"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Technical Charts Container -->
+                                <div id="technicalChartsContainer">
+                                    <div class="chart-loading">
+                                        <div class="spinner"></div>
+                                        <div class="chart-loading-text">Lade technische Analyse...</div>
+                                    </div>
+                                </div>
                             </div>
                             <div id="fundamental-tab" class="tab-pane">
                                 <!-- Fundamentalanalyse -->
@@ -771,5 +810,8 @@
 
     <!-- Mini Charts Feature -->
     <script src="/static/js/mini-charts.js"></script>
+
+    <!-- Technical Charts Feature -->
+    <script src="/static/js/technical-charts.js"></script>
 </body>
 </html>

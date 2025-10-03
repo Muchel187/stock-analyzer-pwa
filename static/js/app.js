@@ -4,8 +4,11 @@ class StockAnalyzerApp {
         this.currentPage = 'dashboard';
         this.currentUser = null;
         this.aiVisualizer = new AIAnalysisVisualizer();
+        this.technicalChartsManager = typeof TechnicalChartsManager !== 'undefined' ? new TechnicalChartsManager() : null;
         this.currentAnalysisTicker = null;
         this.currentStockPrice = null;
+        this.currentStockData = null;
+        this.currentTechnicalData = null;
         this.currentPeriod = '1y';
         this.priceChartInstance = null;
         this.volumeChartInstance = null;
@@ -864,6 +867,8 @@ class StockAnalyzerApp {
         // Store current ticker and price for AI analysis
         this.currentAnalysisTicker = data.ticker;
         this.currentStockPrice = data.info.current_price;
+        this.currentStockData = data;
+        this.currentTechnicalData = data;
 
         // Display header
         document.getElementById('stockName').textContent = `${data.info.ticker} - ${data.info.company_name}`;
@@ -2919,6 +2924,223 @@ class StockAnalyzerApp {
             console.error('Error adding to watchlist:', error);
             this.showNotification(error.message || 'Fehler beim Hinzufügen zur Watchlist', 'error');
         }
+    }
+
+    /**
+     * Initialize Technical Analysis Charts
+     * Creates Bollinger Bands, MACD, RSI, and Volume charts
+     */
+    async initTechnicalCharts(data) {
+        console.log('[TechnicalCharts] Initializing charts for', this.currentAnalysisTicker);
+
+        if (!this.technicalChartsManager) {
+            console.error('[TechnicalCharts] TechnicalChartsManager not initialized');
+            return;
+        }
+
+        const container = document.getElementById('technicalChartsContainer');
+        if (!container) {
+            console.error('[TechnicalCharts] Container not found');
+            return;
+        }
+
+        try {
+            // Prepare data for charts
+            const stockData = await this.prepareTechnicalChartData(data);
+
+            // Create charts using TechnicalChartsManager
+            this.technicalChartsManager.createTechnicalDashboard('technicalChartsContainer', stockData);
+
+            // Update info cards
+            this.updateTechnicalInfoCards(data.technical_indicators);
+
+            console.log('[TechnicalCharts] Charts initialized successfully');
+        } catch (error) {
+            console.error('[TechnicalCharts] Error initializing charts:', error);
+            container.innerHTML = `
+                <div class="error-state">
+                    <p>❌ Fehler beim Laden der technischen Charts</p>
+                    <button class="btn btn-secondary" onclick="app.switchAnalysisTab('technical')">Erneut versuchen</button>
+                </div>
+            `;
+        }
+    }
+
+    /**
+     * Prepare data for technical charts from API response
+     */
+    async prepareTechnicalChartData(data) {
+        // Get historical price data
+        const historyResponse = await api.getStockHistory(this.currentAnalysisTicker, this.currentPeriod);
+        const historyData = historyResponse.data || [];
+
+        // Extract data arrays
+        const dates = historyData.map(d => d.date);
+        const prices = historyData.map(d => d.close);
+        const volumes = historyData.map(d => d.volume);
+        const opens = historyData.map(d => d.open);
+        const highs = historyData.map(d => d.high);
+        const lows = historyData.map(d => d.low);
+
+        // Calculate Bollinger Bands
+        const bollinger = this.calculateBollingerBands(prices, 20, 2);
+
+        // Calculate MACD
+        const macd = this.calculateMACD(prices);
+
+        // Calculate RSI
+        const rsi = this.calculateRSI(prices, 14);
+
+        // Calculate Volume MA
+        const volumeMA = this.calculateSMA(volumes, 20);
+
+        // Calculate price changes for volume coloring
+        const priceChanges = prices.map((price, i) =>
+            i > 0 ? price - prices[i - 1] : 0
+        );
+
+        return {
+            ticker: this.currentAnalysisTicker,
+            dates: dates,
+            prices: prices,
+            volumes: volumes,
+            bollinger: bollinger,
+            macd: macd,
+            rsi: rsi,
+            volumeMA: volumeMA,
+            priceChanges: priceChanges
+        };
+    }
+
+    /**
+     * Calculate Bollinger Bands (SMA ± 2 Std Dev)
+     */
+    calculateBollingerBands(prices, period = 20, stdDevMultiplier = 2) {
+        const sma = this.calculateSMA(prices, period);
+        const upper = [];
+        const lower = [];
+
+        for (let i = 0; i < prices.length; i++) {
+            if (i < period - 1) {
+                upper.push(null);
+                lower.push(null);
+            } else {
+                const slice = prices.slice(i - period + 1, i + 1);
+                const mean = sma[i];
+                const variance = slice.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / period;
+                const stdDev = Math.sqrt(variance);
+
+                upper.push(mean + stdDev * stdDevMultiplier);
+                lower.push(mean - stdDev * stdDevMultiplier);
+            }
+        }
+
+        return {
+            upper: upper,
+            middle: sma,
+            lower: lower
+        };
+    }
+
+    /**
+     * Calculate MACD (12, 26, 9)
+     */
+    calculateMACD(prices, fastPeriod = 12, slowPeriod = 26, signalPeriod = 9) {
+        const emaFast = this.calculateEMA(prices, fastPeriod);
+        const emaSlow = this.calculateEMA(prices, slowPeriod);
+
+        const macdLine = emaFast.map((fast, i) => fast - emaSlow[i]);
+        const signalLine = this.calculateEMA(macdLine, signalPeriod);
+        const histogram = macdLine.map((macd, i) => macd - signalLine[i]);
+
+        return {
+            macd: macdLine,
+            signal: signalLine,
+            histogram: histogram
+        };
+    }
+
+    /**
+     * Calculate RSI (Relative Strength Index)
+     */
+    calculateRSI(prices, period = 14) {
+        const changes = [];
+        for (let i = 1; i < prices.length; i++) {
+            changes.push(prices[i] - prices[i - 1]);
+        }
+
+        const rsi = [50]; // Start with neutral value
+        let avgGain = 0;
+        let avgLoss = 0;
+
+        // Calculate initial average gain/loss
+        for (let i = 0; i < period; i++) {
+            if (changes[i] > 0) avgGain += changes[i];
+            else avgLoss += Math.abs(changes[i]);
+        }
+        avgGain /= period;
+        avgLoss /= period;
+
+        for (let i = period; i < changes.length; i++) {
+            const change = changes[i];
+            const gain = change > 0 ? change : 0;
+            const loss = change < 0 ? Math.abs(change) : 0;
+
+            avgGain = (avgGain * (period - 1) + gain) / period;
+            avgLoss = (avgLoss * (period - 1) + loss) / period;
+
+            const rs = avgGain / avgLoss;
+            const rsiValue = 100 - (100 / (1 + rs));
+            rsi.push(rsiValue);
+        }
+
+        return rsi;
+    }
+
+    /**
+     * Update technical indicator info cards
+     */
+    updateTechnicalInfoCards(technical) {
+        if (!technical) return;
+
+        // RSI
+        const rsiValue = technical.rsi || 0;
+        document.getElementById('tech-rsi-value').textContent = rsiValue.toFixed(2);
+        const rsiStatus = document.getElementById('tech-rsi-status');
+        if (rsiValue > 70) {
+            rsiStatus.innerHTML = '<span class="indicator-badge bearish">Überkauft</span>';
+        } else if (rsiValue < 30) {
+            rsiStatus.innerHTML = '<span class="indicator-badge bullish">Überverkauft</span>';
+        } else {
+            rsiStatus.innerHTML = '<span class="indicator-badge neutral">Neutral</span>';
+        }
+
+        // MACD
+        const macdValue = technical.macd || 0;
+        const macdSignal = technical.macd_signal || '';
+        document.getElementById('tech-macd-value').textContent = macdValue.toFixed(4);
+        document.getElementById('tech-macd-status').innerHTML =
+            `<span class="indicator-badge ${macdSignal === 'bullish' ? 'bullish' : macdSignal === 'bearish' ? 'bearish' : 'neutral'}">${macdSignal || 'Neutral'}</span>`;
+
+        // Bollinger Band Position
+        const bbPercent = technical.bollinger_position || 50;
+        document.getElementById('tech-bb-value').textContent = bbPercent.toFixed(1) + '%';
+        const bbStatus = document.getElementById('tech-bb-status');
+        if (bbPercent > 80) {
+            bbStatus.innerHTML = '<span class="indicator-badge bearish">Nahe oberer Band</span>';
+        } else if (bbPercent < 20) {
+            bbStatus.innerHTML = '<span class="indicator-badge bullish">Nahe unterer Band</span>';
+        } else {
+            bbStatus.innerHTML = '<span class="indicator-badge neutral">Mittlerer Bereich</span>';
+        }
+
+        // Volatility
+        const volatility = technical.volatility || 0;
+        document.getElementById('tech-volatility-value').textContent = (volatility * 100).toFixed(2) + '%';
+        document.getElementById('tech-volatility-status').innerHTML =
+            volatility > 0.3 ? '<span class="indicator-badge bearish">Hoch</span>' :
+            volatility > 0.15 ? '<span class="indicator-badge neutral">Mittel</span>' :
+            '<span class="indicator-badge bullish">Niedrig</span>';
     }
 }
 
