@@ -61,6 +61,12 @@ htmlcov/
 # Node modules (if using frontend build tools)
 node_modules/
 npm-debug.log*
+package-lock.json
+
+# Webpack cache
+.cache/
+
+# Note: static/dist/ is committed for production deployment
 
 # Temporary files
 tmp/
