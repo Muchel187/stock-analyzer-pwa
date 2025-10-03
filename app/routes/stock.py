@@ -333,7 +333,7 @@ def get_recommendations():
         return jsonify({'error': f'Failed to get recommendations: {str(e)}'}), 500
 
 @bp.route('/ai-recommendations', methods=['POST'])
-@jwt_required()
+@jwt_required(optional=True)
 def get_ai_recommendations():
     """Get AI-powered top buy/sell recommendations - FAST VERSION without AI analysis"""
     logger.info("[AI-RECS] Starting AI recommendations analysis")
