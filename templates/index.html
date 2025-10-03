@@ -824,16 +824,42 @@
     <!-- Notification Container -->
     <div id="notificationContainer" class="notification-container"></div>
 
-    <!-- Scripts - Phase 3: Webpack Bundles (380KB → 196KB, 48% reduction) -->
+    <!-- Scripts - Reverting to original files (bundles causing issues) -->
+    <script src="/static/js/api.js?v=20251003b"></script>
+    <script src="/static/js/components.js?v=20251003"></script>
+    <script src="/static/js/charts.js?v=20251003"></script>
+    <script src="/static/js/ai-analysis.js?v=20251003c"></script>
+    <script src="/static/js/websocket-manager.js?v=20251003"></script>
+    <script src="/static/js/app.js?v=20251003b"></script>
 
-    <!-- Core Bundle: API, Theme, Market Status, Search, Notifications, Charts, Components, Export, App (105KB) -->
-    <script src="/static/dist/bundle.min.js?v=20251003"></script>
+    <!-- Theme Manager -->
+    <script src="/static/js/theme-manager.js"></script>
 
-    <!-- Dashboard Widgets Bundle: Dashboard Charts, Market Indices, Mini Charts, WebSocket (21KB) -->
-    <script src="/static/dist/dashboard-widgets.min.js?v=20251003"></script>
+    <!-- Market Status Widget -->
+    <script src="/static/js/market-status.js"></script>
 
-    <!-- Analysis Bundle: Technical Charts, Advanced Chart, AI Analysis (46KB) -->
-    <script src="/static/dist/analysis.min.js?v=20251003"></script>
+    <!-- Export Manager -->
+    <script src="/static/js/export-manager.js"></script>
+
+    <!-- Phase 3 Part 3: New Features -->
+    <script src="/static/js/global-search.js"></script>
+    <script src="/static/js/notifications.js"></script>
+    <script src="/static/js/dashboard-customizer.js"></script>
+
+    <!-- Mini Charts Feature -->
+    <script src="/static/js/mini-charts.js"></script>
+
+    <!-- Technical Charts Feature -->
+    <script src="/static/js/technical-charts.js"></script>
+
+    <!-- Dashboard Charts Feature -->
+    <script src="/static/js/dashboard-charts.js"></script>
+
+    <!-- Market Indices Feature -->
+    <script src="/static/js/market-indices.js?v=20251003"></script>
+
+    <!-- Advanced Chart Feature -->
+    <script src="/static/js/advanced-chart.js?v=20251003"></script>
 
     <!-- Service Worker Registration -->
     <script>
