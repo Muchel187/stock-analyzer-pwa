@@ -360,3 +360,8 @@ class APIService {
 
 // Create global API instance
 const api = new APIService();
+
+// Export for global access
+if (typeof window !== 'undefined') {
+    window.api = api;
+}
