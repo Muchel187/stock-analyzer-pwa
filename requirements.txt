@@ -18,6 +18,8 @@ numpy==1.26.2
 # API & HTTP
 requests==2.31.0
 httpx==0.25.2
+aiohttp==3.9.1  # Async HTTP for parallel API requests
+aiodns==3.1.1   # Async DNS resolution
 beautifulsoup4==4.12.2
 
 # Caching
