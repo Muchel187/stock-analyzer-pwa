@@ -528,11 +528,142 @@ class StockAnalyzerApp {
                         </div>
                     </div>
                 </div>
+                <button class="btn-chart" onclick="event.stopPropagation(); app.openWatchlistChart('${item.ticker}')" title="Live-Chart für ${item.ticker}">
+                    📊 Chart
+                </button>
                 <button class="btn-ai-analyze" onclick="event.stopPropagation(); app.analyzeWithAI('${item.ticker}')" title="KI-Analyse für ${item.ticker}">
                     <span class="ai-icon">🤖</span> KI
                 </button>
             </div>
         `).join('');
+    }
+
+    openWatchlistChart(ticker) {
+        // Create modal overlay
+        const modalHTML = `
+            <div class="chart-modal-overlay" id="chartModal">
+                <div class="chart-modal-container">
+                    <div class="chart-modal-header">
+                        <div class="chart-modal-title">
+                            <h2>${ticker} Live-Chart</h2>
+                            <span class="chart-modal-subtitle">Interaktiver Chart mit Indikatoren</span>
+                        </div>
+                        <button class="chart-modal-close" onclick="app.closeWatchlistChart()">✕</button>
+                    </div>
+                    <div class="chart-modal-body">
+                        <div class="chart-controls">
+                            <div class="chart-controls-section">
+                                <label class="chart-control-label">Zeitraum:</label>
+                                <div class="chart-period-buttons">
+                                    <button class="chart-control-btn period-btn active" data-period="1mo" onclick="app.changeChartPeriod('1mo')">1M</button>
+                                    <button class="chart-control-btn period-btn" data-period="3mo" onclick="app.changeChartPeriod('3mo')">3M</button>
+                                    <button class="chart-control-btn period-btn" data-period="6mo" onclick="app.changeChartPeriod('6mo')">6M</button>
+                                    <button class="chart-control-btn period-btn" data-period="1y" onclick="app.changeChartPeriod('1y')">1J</button>
+                                </div>
+                            </div>
+                            <div class="chart-controls-section">
+                                <label class="chart-control-label">Indikatoren:</label>
+                                <div class="chart-indicator-buttons">
+                                    <button class="chart-control-btn indicator-btn" data-indicator="sma20" onclick="app.toggleChartIndicator('sma20')">SMA 20</button>
+                                    <button class="chart-control-btn indicator-btn" data-indicator="sma50" onclick="app.toggleChartIndicator('sma50')">SMA 50</button>
+                                    <button class="chart-control-btn indicator-btn" data-indicator="sma200" onclick="app.toggleChartIndicator('sma200')">SMA 200</button>
+                                    <button class="chart-control-btn indicator-btn" data-indicator="ema12" onclick="app.toggleChartIndicator('ema12')">EMA 12</button>
+                                    <button class="chart-control-btn indicator-btn" data-indicator="ema26" onclick="app.toggleChartIndicator('ema26')">EMA 26</button>
+                                    <button class="chart-control-btn indicator-btn" data-indicator="bb" onclick="app.toggleChartIndicator('bb')">Bollinger</button>
+                                </div>
+                            </div>
+                            <div class="chart-controls-section">
+                                <label class="chart-control-label">Zeichnen:</label>
+                                <button class="chart-control-btn drawing-btn" onclick="app.toggleChartDrawing()">📏 Trendlinie</button>
+                                <button class="chart-control-btn clear-btn" onclick="app.clearTrendlines()">🗑️ Löschen</button>
+                            </div>
+                        </div>
+                        <div class="chart-canvas-container">
+                            <canvas id="advancedChartCanvas"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Insert modal into DOM
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+        // Initialize advanced chart
+        this.currentAdvancedChart = new AdvancedChart('advancedChartCanvas', {
+            chartType: 'candlestick'
+        });
+
+        // Load chart data
+        this.loadChartData(ticker, '1mo');
+    }
+
+    async loadChartData(ticker, period) {
+        this.currentChartTicker = ticker;
+        this.currentChartPeriod = period;
+
+        try {
+            const response = await fetch(`/api/stock/${ticker}/history?period=${period}`);
+            const result = await response.json();
+
+            if (result.data && result.data.length > 0) {
+                this.currentAdvancedChart.loadData(result.data);
+            } else {
+                this.showNotification('Keine Chart-Daten verfügbar', 'error');
+            }
+        } catch (error) {
+            console.error('Error loading chart data:', error);
+            this.showNotification('Fehler beim Laden der Chart-Daten', 'error');
+        }
+    }
+
+    changeChartPeriod(period) {
+        // Update active button
+        document.querySelectorAll('.period-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.dataset.period === period) {
+                btn.classList.add('active');
+            }
+        });
+
+        // Reload chart with new period
+        this.loadChartData(this.currentChartTicker, period);
+    }
+
+    toggleChartIndicator(indicator) {
+        const button = document.querySelector(`[data-indicator="${indicator}"]`);
+        const isActive = this.currentAdvancedChart.toggleIndicator(indicator);
+
+        if (isActive) {
+            button.classList.add('active');
+        } else {
+            button.classList.remove('active');
+        }
+    }
+
+    toggleChartDrawing() {
+        const button = document.querySelector('.drawing-btn');
+        this.currentAdvancedChart.enableDrawing();
+        button.classList.add('active');
+        button.textContent = '📏 Zeichnen aktiv';
+    }
+
+    clearTrendlines() {
+        this.currentAdvancedChart.clearTrendlines();
+        const button = document.querySelector('.drawing-btn');
+        button.classList.remove('active');
+        button.textContent = '📏 Trendlinie';
+    }
+
+    closeWatchlistChart() {
+        const modal = document.getElementById('chartModal');
+        if (modal) {
+            modal.remove();
+        }
+        if (this.currentAdvancedChart) {
+            this.currentAdvancedChart.destroy();
+            this.currentAdvancedChart = null;
+        }
     }
 
     async refreshRecommendations() {

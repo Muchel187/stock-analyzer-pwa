@@ -73,6 +73,35 @@
     color: var(--danger-color);
 }
 
+/* Chart Button in Watchlist */
+.btn-chart {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.5rem 0.75rem;
+    background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+    color: white;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+    box-shadow: 0 2px 4px rgba(72, 187, 120, 0.3);
+}
+
+.btn-chart:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(72, 187, 120, 0.5);
+    background: linear-gradient(135deg, #38a169 0%, #48bb78 100%);
+}
+
+.btn-chart:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(72, 187, 120, 0.3);
+}
+
 /* AI Analysis Button in Watchlist */
 .btn-ai-analyze {
     display: flex;

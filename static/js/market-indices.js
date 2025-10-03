@@ -7,10 +7,11 @@ class MarketIndicesWidget {
     constructor() {
         this.charts = {};
         this.updateInterval = null;
+        // Use ETFs as proxies since index symbols (^GDAXI, ^GSPC, ^IXIC) aren't supported by APIs
         this.indices = [
-            { symbol: '^GDAXI', name: 'DAX', color: 'rgb(102, 126, 234)' },
-            { symbol: '^GSPC', name: 'S&P 500', color: 'rgb(72, 187, 120)' },
-            { symbol: '^IXIC', name: 'NASDAQ', color: 'rgb(245, 101, 101)' }
+            { symbol: 'SPY', name: 'S&P 500 ETF', color: 'rgb(72, 187, 120)' },
+            { symbol: 'QQQ', name: 'NASDAQ-100 ETF', color: 'rgb(245, 101, 101)' },
+            { symbol: 'SAP', name: 'DAX (SAP)', color: 'rgb(102, 126, 234)' }
         ];
     }
 
@@ -61,8 +62,8 @@ class MarketIndicesWidget {
      */
     async loadIndexChart(index) {
         try {
-            // Fetch historical data (1 day intraday for live feel)
-            const response = await fetch(`/api/stock/${index.symbol}/history?period=1d`);
+            // Fetch historical data (5 days for smooth chart with enough data points)
+            const response = await fetch(`/api/stock/${index.symbol}/history?period=5d`);
             const result = await response.json();
 
             if (!result.data || result.data.length === 0) {
@@ -115,7 +116,8 @@ class MarketIndicesWidget {
         const prices = data.map(d => d.close);
         const times = data.map(d => {
             const date = new Date(d.date);
-            return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+            // Format as "DD.MM" for multi-day charts
+            return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
         });
 
         // Create gradient
