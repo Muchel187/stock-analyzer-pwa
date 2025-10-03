@@ -3,6 +3,12 @@ class AIAnalysisVisualizer {
     constructor() {
         this.radarChart = null;
         this.riskChart = null;
+        this.technicalChart = null;
+        this.currentTicker = null;
+        this.priceData = null;
+        this.showSMA50 = false;
+        this.showSMA200 = false;
+        this.showBB = false;
     }
 
     /**
@@ -11,6 +17,9 @@ class AIAnalysisVisualizer {
     async renderAnalysis(ticker, currentPrice = null) {
         const container = document.getElementById('ai-tab');
         container.innerHTML = '<div class="loading-spinner">KI-Analyse wird durchgeführt...</div>';
+
+        // Store ticker for chart loading
+        this.currentTicker = ticker;
 
         try {
             // Fetch AI analysis using GET endpoint
@@ -29,6 +38,7 @@ class AIAnalysisVisualizer {
             // Initialize charts after DOM is ready
             setTimeout(() => {
                 this.initializeCharts(data);
+                this.loadTechnicalChart(ticker);
             }, 100);
 
         } catch (error) {
@@ -85,6 +95,30 @@ class AIAnalysisVisualizer {
                 <!-- Score Dashboard -->
                 <div class="ai-scores-grid">
                     ${this.generateScoreCards(data)}
+                </div>
+
+                <!-- Technical Price Chart with Indicators -->
+                <div class="ai-card full-width-card">
+                    <div class="chart-header">
+                        <h4>📊 Technischer Preis-Chart mit Indikatoren</h4>
+                        <div class="chart-controls-inline">
+                            <label class="indicator-toggle">
+                                <input type="checkbox" id="aiChartSMA50" onchange="window.aiVisualizer.toggleChartIndicator('sma50', this.checked)">
+                                <span>SMA 50</span>
+                            </label>
+                            <label class="indicator-toggle">
+                                <input type="checkbox" id="aiChartSMA200" onchange="window.aiVisualizer.toggleChartIndicator('sma200', this.checked)">
+                                <span>SMA 200</span>
+                            </label>
+                            <label class="indicator-toggle">
+                                <input type="checkbox" id="aiChartBB" onchange="window.aiVisualizer.toggleChartIndicator('bb', this.checked)">
+                                <span>Bollinger Bands</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="technical-chart-container">
+                        <canvas id="aiTechnicalChart"></canvas>
+                    </div>
                 </div>
 
                 <!-- Visual Analysis Section -->
@@ -1051,6 +1085,213 @@ class AIAnalysisVisualizer {
                 </div>
             </div>
         `;
+    }
+
+    /**
+     * Load and render technical price chart with indicators
+     */
+    async loadTechnicalChart(ticker) {
+        try {
+            // Fetch 6 months of historical data
+            const response = await fetch(`/api/stock/${ticker}/history?period=6mo`);
+            const result = await response.json();
+
+            if (!result.data || result.data.length === 0) {
+                console.error('No price data available for technical chart');
+                return;
+            }
+
+            this.priceData = result.data;
+            this.renderTechnicalChart();
+        } catch (error) {
+            console.error('Error loading technical chart:', error);
+        }
+    }
+
+    /**
+     * Render technical chart with price and indicators
+     */
+    renderTechnicalChart() {
+        const canvas = document.getElementById('aiTechnicalChart');
+        if (!canvas || !this.priceData) return;
+
+        // Destroy existing chart
+        if (this.technicalChart) {
+            this.technicalChart.destroy();
+        }
+
+        const ctx = canvas.getContext('2d');
+        const dates = this.priceData.map(d => d.date);
+        const prices = this.priceData.map(d => d.close);
+
+        const datasets = [{
+            label: `${this.currentTicker} Preis`,
+            data: prices,
+            borderColor: 'rgb(102, 126, 234)',
+            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.1,
+            pointRadius: 0,
+            pointHoverRadius: 4
+        }];
+
+        // Add SMA 50 if enabled
+        if (this.showSMA50) {
+            const sma50 = this.calculateSMA(prices, 50);
+            datasets.push({
+                label: 'SMA 50',
+                data: sma50,
+                borderColor: 'rgb(72, 187, 120)',
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                fill: false,
+                tension: 0.1,
+                pointRadius: 0
+            });
+        }
+
+        // Add SMA 200 if enabled
+        if (this.showSMA200) {
+            const sma200 = this.calculateSMA(prices, 200);
+            datasets.push({
+                label: 'SMA 200',
+                data: sma200,
+                borderColor: 'rgb(245, 101, 101)',
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                fill: false,
+                tension: 0.1,
+                pointRadius: 0
+            });
+        }
+
+        // Add Bollinger Bands if enabled
+        if (this.showBB) {
+            const bb = this.calculateBollingerBands(prices, 20, 2);
+            datasets.push({
+                label: 'BB Upper',
+                data: bb.upper,
+                borderColor: 'rgba(128, 128, 128, 0.5)',
+                backgroundColor: 'transparent',
+                borderWidth: 1,
+                borderDash: [5, 5],
+                fill: false,
+                pointRadius: 0
+            });
+            datasets.push({
+                label: 'BB Lower',
+                data: bb.lower,
+                borderColor: 'rgba(128, 128, 128, 0.5)',
+                backgroundColor: 'transparent',
+                borderWidth: 1,
+                borderDash: [5, 5],
+                fill: false,
+                pointRadius: 0
+            });
+        }
+
+        this.technicalChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: dates,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    },
+                    tooltip: {
+                        enabled: true,
+                        mode: 'index',
+                        intersect: false
+                    }
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Datum'
+                        }
+                    },
+                    y: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Preis ($)'
+                        },
+                        beginAtZero: false
+                    }
+                }
+            }
+        });
+    }
+
+    /**
+     * Toggle chart indicator visibility
+     */
+    toggleChartIndicator(indicator, enabled) {
+        switch (indicator) {
+            case 'sma50':
+                this.showSMA50 = enabled;
+                break;
+            case 'sma200':
+                this.showSMA200 = enabled;
+                break;
+            case 'bb':
+                this.showBB = enabled;
+                break;
+        }
+        this.renderTechnicalChart();
+    }
+
+    /**
+     * Calculate Simple Moving Average
+     */
+    calculateSMA(data, period) {
+        const result = [];
+        for (let i = 0; i < data.length; i++) {
+            if (i < period - 1) {
+                result.push(null);
+            } else {
+                const sum = data.slice(i - period + 1, i + 1).reduce((a, b) => a + b, 0);
+                result.push(sum / period);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Calculate Bollinger Bands
+     */
+    calculateBollingerBands(data, period, stdDev) {
+        const sma = this.calculateSMA(data, period);
+        const upper = [], lower = [];
+
+        for (let i = 0; i < data.length; i++) {
+            if (i < period - 1) {
+                upper.push(null);
+                lower.push(null);
+            } else {
+                const slice = data.slice(i - period + 1, i + 1);
+                const mean = sma[i];
+                const variance = slice.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / period;
+                const sd = Math.sqrt(variance);
+                upper.push(mean + sd * stdDev);
+                lower.push(mean - sd * stdDev);
+            }
+        }
+
+        return { upper, middle: sma, lower };
     }
 }
 
