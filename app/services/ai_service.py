@@ -10,17 +10,11 @@ class AIService:
     """Service for AI-enhanced stock analysis using OpenAI or Google Gemini API"""
 
     def __init__(self):
-        # Check for Google Gemini API first, then OpenAI
+        # Check for OpenAI API first (more reliable), then Google Gemini as fallback
         self.google_api_key = os.environ.get('GOOGLE_API_KEY')
         self.openai_api_key = os.environ.get('OPENAI_API_KEY')
 
-        if self.google_api_key:
-            self.provider = 'google'
-            self.provider_name = 'Google Gemini 2.5 Pro'
-            # Using Gemini 2.5 Pro (latest model with enhanced reasoning, Oct 2025)
-            self.api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={self.google_api_key}"
-            logger.info("Using Google Gemini 2.5 Pro for stock analysis")
-        elif self.openai_api_key:
+        if self.openai_api_key:
             self.provider = 'openai'
             self.provider_name = 'OpenAI GPT-4'
             self.api_url = "https://api.openai.com/v1/chat/completions"
@@ -28,7 +22,13 @@ class AIService:
                 "Authorization": f"Bearer {self.openai_api_key}",
                 "Content-Type": "application/json"
             }
-            logger.info("Using OpenAI GPT-4 for stock analysis")
+            logger.info("Using OpenAI GPT-4 for stock analysis (PRIMARY)")
+        elif self.google_api_key:
+            self.provider = 'google'
+            self.provider_name = 'Google Gemini 2.5 Flash'
+            # Using Gemini 2.5 Flash (fast and reliable)
+            self.api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key={self.google_api_key}"
+            logger.info("Using Google Gemini 2.5 Flash for stock analysis (FALLBACK)")
         else:
             self.provider = None
             self.provider_name = 'None'
@@ -337,7 +337,15 @@ Base the data on realistic price movements for this stock. Use your knowledge of
     def _call_google_gemini(self, prompt: str) -> Optional[str]:
         """Call Google Gemini API"""
         try:
-            system_prompt = "You are an expert financial analyst providing detailed stock analysis. Provide insights in a structured format with clear sections for Technical Analysis, Fundamental Analysis, Risks, Opportunities, and a final Investment Recommendation. Be data-driven and objective."
+            system_prompt = """You are the world's leading financial analyst with 30+ years of experience in equity research, technical analysis, and portfolio management. You have:
+
+- An impeccable track record of identifying market opportunities and risks
+- Deep expertise in analyzing stocks across all sectors and market caps
+- Mastery of both fundamental and technical analysis methodologies
+- The ability to synthesize complex financial data into actionable insights
+- A reputation for accuracy, objectivity, and data-driven recommendations
+
+Your analysis is sought after by institutional investors, hedge funds, and individual investors worldwide. You provide comprehensive, structured analysis with clear sections for Technical Analysis, Fundamental Analysis, Risks, Opportunities, Price Targets, Short Squeeze Potential, and a final Investment Recommendation. You are precise, thorough, and always support your conclusions with solid evidence."""
 
             payload = {
                 "contents": [{
@@ -402,15 +410,23 @@ Base the data on realistic price movements for this stock. Use your knowledge of
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You are an expert financial analyst providing detailed stock analysis. Provide insights in a structured format with clear sections for Technical Analysis, Fundamental Analysis, Risks, Opportunities, and a final Investment Recommendation. Be data-driven and objective."
+                        "content": """You are the world's leading financial analyst with 30+ years of experience in equity research, technical analysis, and portfolio management. You have:
+
+- An impeccable track record of identifying market opportunities and risks
+- Deep expertise in analyzing stocks across all sectors and market caps
+- Mastery of both fundamental and technical analysis methodologies
+- The ability to synthesize complex financial data into actionable insights
+- A reputation for accuracy, objectivity, and data-driven recommendations
+
+Your analysis is sought after by institutional investors, hedge funds, and individual investors worldwide. You provide comprehensive, structured analysis with clear sections for Technical Analysis, Fundamental Analysis, Risks, Opportunities, Price Targets, Short Squeeze Potential, and a final Investment Recommendation. You are precise, thorough, and always support your conclusions with solid evidence."""
                     },
                     {
                         "role": "user",
                         "content": prompt
                     }
                 ],
-                "temperature": 0.3,
-                "max_tokens": 1500
+                "temperature": 0.4,
+                "max_tokens": 4000
             }
 
             response = requests.post(self.api_url, headers=self.headers, json=payload, timeout=30)
