@@ -603,14 +603,8 @@ class StockAnalyzerApp {
         this.currentChartPeriod = period;
 
         try {
-            const response = await fetch(`/api/stock/${ticker}/history?period=${period}`);
-            const result = await response.json();
-
-            if (result.data && result.data.length > 0) {
-                this.currentAdvancedChart.loadData(result.data);
-            } else {
-                this.showNotification('Keine Chart-Daten verfügbar', 'error');
-            }
+            // AdvancedChart.loadData() fetches data itself, just pass ticker and period
+            await this.currentAdvancedChart.loadData(ticker, period);
         } catch (error) {
             console.error('Error loading chart data:', error);
             this.showNotification('Fehler beim Laden der Chart-Daten', 'error');
