@@ -23,6 +23,7 @@
     <link rel="stylesheet" href="/static/css/components.css?v=20251003">
     <link rel="stylesheet" href="/static/css/ai-analysis.css?v=20251003">
     <link rel="stylesheet" href="/static/css/technical-charts.css?v=20251003">
+    <link rel="stylesheet" href="/static/css/dashboard-charts.css?v=20251003">
 
     <!-- Chart.js für Diagramme -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -132,9 +133,9 @@
 
             <div class="dashboard-grid" id="dashboardGrid">
                 <!-- Portfolio Widget -->
-                <div class="widget" id="portfolio-widget">
+                <div class="widget widget-full" id="portfolio-widget">
                     <div class="widget-header">
-                        <h3>Portfolio Performance</h3>
+                        <h3>📊 Portfolio Performance</h3>
                         <span class="widget-actions">
                             <button class="btn-icon" onclick="app.refreshPortfolio()">🔄</button>
                         </span>
@@ -155,7 +156,41 @@
                                     <span class="metric-value" id="totalReturn">-</span>
                                 </div>
                             </div>
-                            <canvas id="portfolioChart" style="display:none;"></canvas>
+
+                            <!-- Portfolio Charts Grid -->
+                            <div class="charts-grid" id="portfolioChartsGrid" style="display:none; margin-top: 24px;">
+                                <!-- Distribution Chart -->
+                                <div class="dashboard-chart-card distribution-chart">
+                                    <div class="dashboard-chart-header">
+                                        <div>
+                                            <div class="dashboard-chart-title">
+                                                <span class="icon">📊</span>
+                                                Portfolio Verteilung
+                                            </div>
+                                            <div class="dashboard-chart-subtitle">Allocation nach Ticker</div>
+                                        </div>
+                                    </div>
+                                    <div class="dashboard-chart-canvas-container">
+                                        <canvas id="portfolioDistributionChart"></canvas>
+                                    </div>
+                                </div>
+
+                                <!-- Performance Chart -->
+                                <div class="dashboard-chart-card performance-chart">
+                                    <div class="dashboard-chart-header">
+                                        <div>
+                                            <div class="dashboard-chart-title">
+                                                <span class="icon">📈</span>
+                                                Performance Entwicklung
+                                            </div>
+                                            <div class="dashboard-chart-subtitle">30-Tage Verlauf</div>
+                                        </div>
+                                    </div>
+                                    <div class="dashboard-chart-canvas-container">
+                                        <canvas id="portfolioPerformanceChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -813,5 +848,8 @@
 
     <!-- Technical Charts Feature -->
     <script src="/static/js/technical-charts.js"></script>
+
+    <!-- Dashboard Charts Feature -->
+    <script src="/static/js/dashboard-charts.js"></script>
 </body>
 </html>

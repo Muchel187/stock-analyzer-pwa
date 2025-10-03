@@ -5,6 +5,7 @@ class StockAnalyzerApp {
         this.currentUser = null;
         this.aiVisualizer = new AIAnalysisVisualizer();
         this.technicalChartsManager = typeof TechnicalChartsManager !== 'undefined' ? new TechnicalChartsManager() : null;
+        this.dashboardChartsManager = typeof DashboardChartsManager !== 'undefined' ? new DashboardChartsManager() : null;
         this.currentAnalysisTicker = null;
         this.currentStockPrice = null;
         this.currentStockData = null;
@@ -446,6 +447,12 @@ class StockAnalyzerApp {
         try {
             const portfolio = await api.getPortfolio();
             this.displayPortfolioSummary(portfolio.summary);
+
+            // Initialize dashboard charts if there are portfolio items
+            if (portfolio.items && portfolio.items.length > 0) {
+                this.initDashboardCharts(portfolio);
+            }
+
             summaryEl.classList.remove('loading');
         } catch (error) {
             this.showNotification('Failed to load portfolio', 'error');
@@ -3141,6 +3148,92 @@ class StockAnalyzerApp {
             volatility > 0.3 ? '<span class="indicator-badge bearish">Hoch</span>' :
             volatility > 0.15 ? '<span class="indicator-badge neutral">Mittel</span>' :
             '<span class="indicator-badge bullish">Niedrig</span>';
+    }
+
+    /**
+     * Initialize Dashboard Charts
+     * Creates portfolio distribution and performance charts on dashboard
+     */
+    initDashboardCharts(portfolio) {
+        console.log('[DashboardCharts] Initializing charts for portfolio:', portfolio);
+
+        if (!this.dashboardChartsManager) {
+            console.warn('[DashboardCharts] DashboardChartsManager not initialized');
+            return;
+        }
+
+        try {
+            const chartsGrid = document.getElementById('portfolioChartsGrid');
+            if (!chartsGrid) {
+                console.error('[DashboardCharts] Charts grid container not found');
+                return;
+            }
+
+            // Show charts grid
+            chartsGrid.style.display = 'grid';
+
+            // Prepare distribution data (top 8 holdings)
+            const distributionData = portfolio.items
+                .sort((a, b) => (b.current_value || 0) - (a.current_value || 0))
+                .slice(0, 8)
+                .map(item => ({
+                    ticker: item.ticker,
+                    value: item.current_value || 0,
+                    percentage: ((item.current_value || 0) / (portfolio.summary.total_value || 1)) * 100
+                }));
+
+            // Create distribution chart
+            this.dashboardChartsManager.createPortfolioDistribution(
+                'portfolioDistributionChart',
+                distributionData
+            );
+
+            // Prepare performance data (simulated 30-day data)
+            // In a real app, this would come from backend historical portfolio values
+            const performanceData = this.generatePortfolioPerformanceData(
+                portfolio.summary.total_value || 0,
+                portfolio.summary.total_gain_loss_percent || 0
+            );
+
+            // Create performance chart
+            this.dashboardChartsManager.createPortfolioPerformance(
+                'portfolioPerformanceChart',
+                performanceData
+            );
+
+            console.log('[DashboardCharts] Charts initialized successfully');
+        } catch (error) {
+            console.error('[DashboardCharts] Error initializing charts:', error);
+        }
+    }
+
+    /**
+     * Generate simulated portfolio performance data
+     * In a real app, this would be fetched from backend
+     */
+    generatePortfolioPerformanceData(currentValue, totalGainPercent) {
+        const data = [];
+        const days = 30;
+        const startValue = currentValue / (1 + (totalGainPercent / 100));
+
+        for (let i = 0; i < days; i++) {
+            const date = new Date();
+            date.setDate(date.getDate() - (days - i - 1));
+
+            // Simulate growth with some volatility
+            const progress = i / (days - 1);
+            const trend = startValue + (currentValue - startValue) * progress;
+            const volatility = (Math.random() - 0.5) * (currentValue * 0.02);
+            const value = trend + volatility;
+
+            data.push({
+                date: date.toLocaleDateString('de-DE', { month: 'short', day: 'numeric' }),
+                value: Math.max(value, 0),
+                change: i > 0 ? value - data[i - 1].value : 0
+            });
+        }
+
+        return data;
     }
 }
 
