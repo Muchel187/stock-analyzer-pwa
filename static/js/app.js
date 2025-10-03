@@ -589,9 +589,9 @@ class StockAnalyzerApp {
         // Insert modal into DOM
         document.body.insertAdjacentHTML('beforeend', modalHTML);
 
-        // Initialize advanced chart
+        // Initialize advanced chart (use line chart, candlestick requires additional Chart.js plugin)
         this.currentAdvancedChart = new AdvancedChart('advancedChartCanvas', {
-            chartType: 'candlestick'
+            candlestick: false  // Use line chart instead of candlestick
         });
 
         // Load chart data
