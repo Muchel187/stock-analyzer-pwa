@@ -16,7 +16,7 @@ class AIService:
 
         if self.openai_api_key:
             self.provider = 'openai'
-            self.provider_name = 'OpenAI GPT-4'
+            self.provider_name = 'OpenAI GPT-4o'
             self.api_url = "https://api.openai.com/v1/chat/completions"
             self.headers = {
                 "Authorization": f"Bearer {self.openai_api_key}",
@@ -129,7 +129,7 @@ Provide realistic estimates based on your knowledge. If you don't have data, use
                     self.api_url,
                     headers=self.headers,
                     json={
-                        "model": "gpt-4",
+                        "model": "gpt-4o",
                         "messages": [{"role": "user", "content": prompt}],
                         "temperature": 0.1,
                         "max_tokens": 4096
@@ -222,7 +222,7 @@ Base the data on realistic price movements for this stock. Use your knowledge of
                     self.api_url,
                     headers=self.headers,
                     json={
-                        "model": "gpt-4",
+                        "model": "gpt-4o",
                         "messages": [{"role": "user", "content": prompt}],
                         "temperature": 0.1,
                         "max_tokens": 8192
@@ -406,7 +406,7 @@ Your analysis is sought after by institutional investors, hedge funds, and indiv
         """Call OpenAI API"""
         try:
             payload = {
-                "model": "gpt-4",
+                "model": "gpt-4o",
                 "messages": [
                     {
                         "role": "system",
@@ -872,7 +872,7 @@ Provide:
 """
 
             payload = {
-                "model": "gpt-4",
+                "model": "gpt-4o",
                 "messages": [
                     {
                         "role": "system",
