@@ -336,6 +336,7 @@ def get_recommendations():
 @jwt_required()
 def get_ai_recommendations():
     """Get AI-powered top buy/sell recommendations - FAST VERSION without AI analysis"""
+    logger.info("[AI-RECS] Starting AI recommendations analysis")
     try:
         # OPTIMIZATION: Skip AI analysis for speed, use technical + fundamental scores only
         # Top US stocks to analyze (S&P 500 leaders + trending)
@@ -483,6 +484,9 @@ def get_ai_recommendations():
                         'summary': f"Score: {mock_fundamental.get('overall_score', 35):.0f}/100. Mock data: Weak fundamentals suggest caution."
                     })
 
+        logger.info(f"[AI-RECS] Analysis complete: {len(buy_recs)} BUY, {len(sell_recs)} SELL from {len(recommendations)} total")
+        logger.info(f"[AI-RECS] Failed API calls: {failed_count}")
+
         return jsonify({
             'top_buys': buy_recs[:10],  # Ensure max 10
             'top_sells': sell_recs[:10],  # Ensure max 10
@@ -492,6 +496,9 @@ def get_ai_recommendations():
         }), 200
 
     except Exception as e:
+        logger.error(f"[AI-RECS] ERROR: {str(e)}")
+        import traceback
+        logger.error(f"[AI-RECS] Traceback: {traceback.format_exc()}")
         return jsonify({'error': f'Failed to generate AI recommendations: {str(e)}'}), 500
 
 @bp.route('/compare', methods=['POST'])
