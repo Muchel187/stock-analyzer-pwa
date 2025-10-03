@@ -3,11 +3,16 @@ from app import db
 
 class StockCache(db.Model):
     __tablename__ = 'stock_cache'
+    __table_args__ = (
+        db.Index('idx_ticker_datatype', 'ticker', 'data_type'),
+        db.Index('idx_ticker_expires', 'ticker', 'expires_at'),
+        db.UniqueConstraint('ticker', 'data_type', name='uq_ticker_datatype'),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
-    ticker = db.Column(db.String(20), nullable=False, unique=True, index=True)
+    ticker = db.Column(db.String(20), nullable=False)
     data = db.Column(db.JSON, nullable=False)
-    data_type = db.Column(db.String(50))  # quote, info, history, analysis
+    data_type = db.Column(db.String(50), nullable=False)  # quote, info, history, analysis
     cached_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     expires_at = db.Column(db.DateTime, nullable=False)
 
