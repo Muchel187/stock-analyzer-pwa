@@ -24,6 +24,7 @@
     <link rel="stylesheet" href="/static/css/ai-analysis.css?v=20251003">
     <link rel="stylesheet" href="/static/css/technical-charts.css?v=20251003">
     <link rel="stylesheet" href="/static/css/dashboard-charts.css?v=20251003">
+    <link rel="stylesheet" href="/static/css/market-indices.css?v=20251003">
 
     <!-- Chart.js für Diagramme -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -191,6 +192,19 @@
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Market Indices Widget -->
+                <div class="widget widget-full" id="market-indices-widget">
+                    <div class="widget-header">
+                        <h3>📊 Markt-Indizes Live</h3>
+                        <span class="widget-subtitle">DAX, S&P 500, NASDAQ</span>
+                    </div>
+                    <div class="widget-body">
+                        <div id="marketIndicesContainer">
+                            <!-- Market indices charts werden hier eingefügt -->
                         </div>
                     </div>
                 </div>
@@ -851,5 +865,11 @@
 
     <!-- Dashboard Charts Feature -->
     <script src="/static/js/dashboard-charts.js"></script>
+
+    <!-- Market Indices Feature -->
+    <script src="/static/js/market-indices.js"></script>
+
+    <!-- Advanced Chart Feature -->
+    <script src="/static/js/advanced-chart.js"></script>
 </body>
 </html>

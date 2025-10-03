@@ -424,6 +424,14 @@ class StockAnalyzerApp {
 
     // Dashboard functionality
     async loadDashboard() {
+        // Initialize market indices widget
+        if (typeof MarketIndicesWidget !== 'undefined') {
+            if (!this.marketIndicesWidget) {
+                this.marketIndicesWidget = new MarketIndicesWidget();
+            }
+            this.marketIndicesWidget.init('marketIndicesContainer');
+        }
+
         if (this.currentUser) {
             await Promise.all([
                 this.refreshPortfolio(),
