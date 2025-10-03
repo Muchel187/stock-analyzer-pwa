@@ -310,7 +310,7 @@ class HistoricalDataService:
 
     @staticmethod
     def _store_data(ticker: str, data: List[Dict], source: str) -> bool:
-        """Store historical data in database using optimized batch insert"""
+        """Store historical data in database using optimized batch upsert"""
         try:
             if not data or len(data) == 0:
                 logger.warning(f"[Historical] No data to store for {ticker}")
@@ -327,7 +327,7 @@ class HistoricalDataService:
                 HistoricalPrice.query.filter_by(ticker=ticker).all()
             }
 
-            new_records = []
+            new_count = 0
             updated_count = 0
 
             for point in data:
@@ -345,8 +345,8 @@ class HistoricalDataService:
                     existing.updated_at = datetime.now()
                     updated_count += 1
                 else:
-                    # Prepare new record for batch insert
-                    new_records.append(HistoricalPrice(
+                    # Create new record (add to session individually to avoid bulk_save_objects constraint issues)
+                    new_record = HistoricalPrice(
                         ticker=ticker,
                         date=point_date,
                         open=point.get('open'),
@@ -355,20 +355,84 @@ class HistoricalDataService:
                         close=point.get('close'),
                         volume=point.get('volume'),
                         source=source
-                    ))
+                    )
+                    db.session.add(new_record)
+                    new_count += 1
 
-            # Batch insert all new records at once
-            if new_records:
-                db.session.bulk_save_objects(new_records)
-
+            # Commit all changes at once
             db.session.commit()
 
-            total_stored = len(new_records) + updated_count
-            logger.info(f"[Historical] Stored {total_stored} points for {ticker} ({len(new_records)} new, {updated_count} updated)")
+            total_stored = new_count + updated_count
+            logger.info(f"[Historical] Stored {total_stored} points for {ticker} ({new_count} new, {updated_count} updated)")
             return total_stored > 0
+
+        except IntegrityError as e:
+            # Handle unique constraint violations gracefully
+            logger.warning(f"[Historical] Integrity error for {ticker}, retrying with merge strategy: {e}")
+            db.session.rollback()
+
+            # Retry with merge strategy (slower but handles duplicates)
+            try:
+                return HistoricalDataService._store_data_with_merge(ticker, data, source)
+            except Exception as retry_error:
+                logger.error(f"[Historical] Merge retry failed for {ticker}: {retry_error}")
+                return False
 
         except Exception as e:
             logger.error(f"[Historical] Error storing data for {ticker}: {e}")
+            db.session.rollback()
+            return False
+
+    @staticmethod
+    def _store_data_with_merge(ticker: str, data: List[Dict], source: str) -> bool:
+        """Fallback method using merge for each record individually (slower but handles all edge cases)"""
+        try:
+            stored_count = 0
+
+            for point in data:
+                try:
+                    # Check if record exists
+                    existing = HistoricalPrice.query.filter_by(
+                        ticker=ticker,
+                        date=point['date']
+                    ).first()
+
+                    if existing:
+                        # Update existing
+                        existing.open = point.get('open', existing.open)
+                        existing.high = point.get('high', existing.high)
+                        existing.low = point.get('low', existing.low)
+                        existing.close = point.get('close', existing.close)
+                        existing.volume = point.get('volume', existing.volume)
+                        existing.source = source
+                        existing.updated_at = datetime.now()
+                    else:
+                        # Create new
+                        new_record = HistoricalPrice(
+                            ticker=ticker,
+                            date=point['date'],
+                            open=point.get('open'),
+                            high=point.get('high'),
+                            low=point.get('low'),
+                            close=point.get('close'),
+                            volume=point.get('volume'),
+                            source=source
+                        )
+                        db.session.add(new_record)
+
+                    stored_count += 1
+
+                except IntegrityError:
+                    # Skip duplicates silently
+                    db.session.rollback()
+                    continue
+
+            db.session.commit()
+            logger.info(f"[Historical] Merge stored {stored_count} points for {ticker}")
+            return stored_count > 0
+
+        except Exception as e:
+            logger.error(f"[Historical] Merge strategy failed for {ticker}: {e}")
             db.session.rollback()
             return False
 
